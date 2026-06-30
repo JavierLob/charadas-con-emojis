@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🎭 Charadas con Emojis</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0e17;
+      --surface: #1a1929;
+      --surface2: #252438;
+      --t1: #ff6b35;
+      --t1-dim: rgba(255,107,53,0.15);
+      --t2: #00b4d8;
+      --t2-dim: rgba(0,180,216,0.15);
+      --accent: #a855f7;
+      --accent-dim: rgba(168,85,247,0.2);
+      --text: #fffffe;
+      --text2: #a7a9be;
+      --success: #06d6a0;
+      --danger: #ef233c;
+      --radius: 14px;
+    }
+
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+    .screen { display: none; height: 100vh; overflow-y: auto; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ── HOME ── */
+    #s-home {
+      align-items: center; justify-content: center; padding: 24px; gap: 18px;
+      background: radial-gradient(ellipse at top, #1e1b3a 0%, var(--bg) 70%);
+    }
+    .logo { font-size: 64px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    .logo-title { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; text-align: center; }
+    .logo-sub { color: var(--text2); font-size: 14px; text-align: center; }
+
+    .card { background: var(--surface); border-radius: var(--radius); padding: 18px; width: 100%; max-width: 380px; }
+    .card h2 { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+    input[type=text] {
+      width: 100%; padding: 14px 16px; background: var(--surface2); border: 2px solid transparent;
+      border-radius: 10px; color: var(--text); font-size: 16px; outline: none; transition: border-color 0.2s;
+    }
+    input[type=text]:focus { border-color: var(--accent); }
+    input[type=text]::placeholder { color: var(--text2); }
+
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 15px; border: none; border-radius: 10px;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s; user-select: none; -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-t1 { background: var(--t1); color: #fff; }
+    .btn-t2 { background: var(--t2); color: #0f0e17; }
+    .btn-ghost { background: var(--surface2); color: var(--text); }
+    .btn-success { background: var(--success); color: #0f0e17; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn:disabled { opacity: 0.4; pointer-events: none; }
+
+    /* Category cards */
+    .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .cat-card {
+      border: 3px solid transparent; border-radius: 14px; padding: 0; cursor: pointer;
+      text-align: center; transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .cat-card.selected { border-color: var(--accent); }
+    .cat-card:active { transform: scale(0.96); }
+    .cat-card-img {
+      height: 70px; display: flex; align-items: center; justify-content: center;
+      font-size: 36px; position: relative; overflow: hidden;
+    }
+    .cat-card-img::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.5) 100%);
+    }
+    .cat-card-body { background: var(--surface2); padding: 8px 6px; }
+    .cat-card-name { font-size: 13px; font-weight: 800; color: var(--text); }
+    .cat-card-sub { font-size: 10px; color: var(--text2); margin-top: 1px; }
+    .cat-card.selected .cat-card-body { background: var(--accent-dim); }
+
+    /* Poster card */
+    .movie-poster {
+      width: 100%; border-radius: 16px; padding: 24px 20px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; text-align: center; position: relative; overflow: hidden;
+      min-height: 160px;
+    }
+    .movie-poster::before {
+      content: ''; position: absolute; inset: 0;
+      background: inherit; filter: blur(2px) brightness(0.7); z-index: 0;
+    }
+    .movie-poster > * { position: relative; z-index: 1; }
+    .poster-emoji { font-size: 52px; line-height: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); }
+    .poster-title {
+      font-size: 22px; font-weight: 900; line-height: 1.2;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8); color: #fff;
+    }
+    .poster-cat { font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 1px; }
+
+    .error-msg { color: var(--danger); font-size: 14px; text-align: center; min-height: 20px; }
+    .divider { display: flex; align-items: center; gap: 10px; color: var(--text2); font-size: 13px; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--surface2); }
+
+    /* ── LOBBY ── */
+    #s-lobby { padding: 0; }
+    .lobby-header {
+      background: var(--surface); padding: 18px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .room-code-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+    .room-code { font-size: 28px; font-weight: 900; letter-spacing: 4px; color: var(--accent); }
+    .lobby-title { font-size: 18px; font-weight: 800; }
+    .lobby-subtitle { font-size: 13px; color: var(--text2); margin-top: 2px; }
+    .lobby-body { flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+
+    .team-section { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .team-col { background: var(--surface); border-radius: var(--radius); padding: 12px; border: 2px solid transparent; }
+    .team-col.t1 { border-color: var(--t1-dim); }
+    .team-col.t2 { border-color: var(--t2-dim); }
+    .team-name { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+    .team-col.t1 .team-name { color: var(--t1); }
+    .team-col.t2 .team-name { color: var(--t2); }
+    .player-chip { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 20px; font-size: 12px; background: var(--surface2); margin-bottom: 4px; }
+    .host-badge { font-size: 10px; background: var(--accent-dim); color: var(--accent); padding: 1px 5px; border-radius: 10px; }
+    .you-badge { font-size: 10px; background: rgba(6,214,160,0.2); color: var(--success); padding: 1px 5px; border-radius: 10px; }
+
+    .join-btns { display: flex; gap: 8px; }
+    .lobby-footer { padding: 14px; background: var(--surface); border-top: 1px solid var(--surface2); }
+
+    /* ── GAME ── */
+    #s-game { overflow: hidden; }
+
+    /* Watch view */
+    .watch-view { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .watch-header {
+      background: var(--surface); padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .timer-ring { width: 52px; height: 52px; position: relative; flex-shrink: 0; }
+    .timer-ring svg { transform: rotate(-90deg); }
+    .timer-ring .bg { stroke: var(--surface2); fill: none; stroke-width: 4; }
+    .timer-ring .fg { stroke: var(--success); fill: none; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 1s linear, stroke 0.5s; }
+    .timer-number { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 800; }
+    .turn-info { text-align: center; flex: 1; }
+    .turn-team { font-size: 14px; font-weight: 700; }
+    .turn-player { font-size: 12px; color: var(--text2); }
+    .score-display { display: flex; gap: 8px; align-items: center; }
+    .score-box { text-align: center; }
+    .score-num { font-size: 24px; font-weight: 900; }
+    .score-box.t1 .score-num { color: var(--t1); }
+    .score-box.t2 .score-num { color: var(--t2); }
+    .score-label { font-size: 10px; color: var(--text2); }
+
+    .emoji-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; overflow: hidden; }
+    .emoji-display { font-size: 54px; line-height: 1.35; text-align: center; word-break: break-all; }
+    .emoji-display.empty { color: var(--text2); font-size: 18px; }
+
+    .watch-footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--surface2); display: flex; flex-direction: column; gap: 8px; }
+    .correct-btn { font-size: 20px; padding: 18px; border-radius: 14px; }
+
+    /* Clue view */
+    .clue-view { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    .clue-header { background: var(--surface); padding: 14px 16px; flex-shrink: 0; }
+    .word-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .word-display {
+      font-size: 22px; font-weight: 900;
+      background: var(--accent-dim); border: 2px solid var(--accent);
+      border-radius: 10px; padding: 10px 14px; text-align: center; line-height: 1.2;
+    }
+    .clue-timer-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .clue-timer-bar { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+    .clue-timer-fill { height: 100%; background: var(--success); border-radius: 3px; transition: width 1s linear, background 0.5s; }
+    .clue-timer-num { font-size: 15px; font-weight: 800; width: 28px; text-align: right; }
+
+    /* Emoji mirror (what everyone sees) */
+    .emoji-mirror {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 20px 16px; overflow: hidden;
+      border-bottom: 1px solid var(--surface2);
+    }
+    .mirror-text { font-size: 50px; line-height: 1.35; text-align: center; word-break: break-all; }
+    .mirror-text.empty { font-size: 16px; color: var(--text2); line-height: 1.5; text-align: center; }
+
+    /* Emoji text input */
+    .emoji-input-wrap { background: var(--surface); padding: 12px 16px; flex-shrink: 0; border-top: 1px solid var(--surface2); }
+    .emoji-input-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .emoji-input-row { display: flex; align-items: center; gap: 8px; }
+    #emoji-input {
+      flex: 1; font-size: 28px; padding: 10px 14px; line-height: 1.3;
+      background: var(--surface2); border: 2px solid var(--accent);
+      border-radius: 10px; color: var(--text); outline: none;
+      min-height: 56px; resize: none; font-family: inherit;
+    }
+    #emoji-input::placeholder { font-size: 16px; color: var(--text2); }
+    .clear-btn {
+      background: var(--surface2); border: none; color: var(--text2);
+      font-size: 20px; width: 48px; height: 56px; border-radius: 10px;
+      cursor: pointer; flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .clear-btn:active { background: var(--danger); color: #fff; }
+
+    .clue-footer { padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--surface2); display: flex; gap: 8px; flex-shrink: 0; }
+    .clue-footer .btn { flex: 1; padding: 14px; font-size: 15px; }
+
+    /* Overlay */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 100; gap: 14px; padding: 24px; text-align: center;
+    }
+    .overlay.show { display: flex; }
+    .overlay-emoji { font-size: 80px; animation: pop 0.4s ease; }
+    @keyframes pop { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
+    .overlay-title { font-size: 28px; font-weight: 900; }
+    .overlay-sub { font-size: 16px; color: var(--text2); }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HOME ═══ -->
+<div id="s-home" class="screen active">
+  <div class="logo">🎭</div>
+  <div class="logo-title">Charadas con Emojis</div>
+  <div class="logo-sub">¡Explica películas y series solo con emojis!</div>
+
+  <div class="card">
+    <h2>Tu nombre</h2>
+    <input type="text" id="player-name" placeholder="¿Cómo te llamas?" maxlength="20" autocomplete="off">
+  </div>
+
+  <div class="card" style="display:flex;flex-direction:column;gap:12px;">
+    <h2>Crear sala · Elige categoría</h2>
+    <div class="cat-grid">
+      <button class="cat-card selected" data-cat="both">
+        <div class="cat-card-img" style="background:linear-gradient(135deg,#6d28d9,#2563eb)">🎬</div>
+        <div class="cat-card-body"><div class="cat-card-name">Todo</div><div class="cat-card-sub">Películas + Series</div></div>
+      </button>
+      <button class="cat-card" data-cat="movies">
+        <div class="cat-card-img" style="background:linear-gradient(135deg,#b91c1c,#d97706)">🎥</div>
+        <div class="cat-card-body"><div class="cat-card-name">Películas</div><div class="cat-card-sub">Solo películas</div></div>
+      </button>
+      <button class="cat-card" data-cat="series">
+        <div class="cat-card-img" style="background:linear-gradient(135deg,#0369a1,#0891b2)">📺</div>
+        <div class="cat-card-body"><div class="cat-card-name">Series</div><div class="cat-card-sub">Solo series</div></div>
+      </button>
+      <button class="cat-card" data-cat="infantiles">
+        <div class="cat-card-img" style="background:linear-gradient(135deg,#f59e0b,#ec4899,#8b5cf6)">🧸</div>
+        <div class="cat-card-body"><div class="cat-card-name">Infantiles</div><div class="cat-card-sub">Disney · Pixar · Studio Ghibli</div></div>
+      </button>
+    </div>
+    <button class="btn btn-primary" id="btn-create">✨ Crear sala</button>
+  </div>
+
+  <div class="divider">o únete con código</div>
+
+  <div class="card" style="display:flex;flex-direction:column;gap:10px;">
+    <input type="text" id="join-code" placeholder="Código de sala" maxlength="5"
+      style="text-transform:uppercase;letter-spacing:3px;text-align:center;font-size:22px;font-weight:800;">
+    <button class="btn btn-ghost" id="btn-join">🔗 Unirse</button>
+  </div>
+
+  <div class="error-msg" id="home-error"></div>
+</div>
+
+<!-- ═══ LOBBY ═══ -->
+<div id="s-lobby" class="screen">
+  <div class="lobby-header">
+    <div>
+      <div class="lobby-title">Sala de espera</div>
+      <div class="lobby-subtitle" id="lobby-cat">—</div>
+    </div>
+    <div>
+      <div class="room-code-label">Código</div>
+      <div class="room-code" id="lobby-code">—</div>
+    </div>
+  </div>
+
+  <div class="lobby-body">
+    <div class="team-section">
+      <div class="team-col t1">
+        <div class="team-name">🟠 Equipo 1</div>
+        <div id="team1-players"></div>
+      </div>
+      <div class="team-col t2">
+        <div class="team-name">🔵 Equipo 2</div>
+        <div id="team2-players"></div>
+      </div>
+    </div>
+
+    <div class="join-btns">
+      <button class="btn btn-t1" style="flex:1" onclick="setTeam(1)">🟠 Equipo 1</button>
+      <button class="btn btn-t2" style="flex:1" onclick="setTeam(2)">🔵 Equipo 2</button>
+    </div>
+
+    <div style="background:var(--surface);border-radius:var(--radius);padding:14px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:6px;">📺 Pantalla para TV / Chromecast</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;">
+        Abre <strong id="display-url" style="color:var(--accent)">—</strong> en Chrome del TV y usa <em>"Transmitir pestaña"</em>.
+      </div>
+    </div>
+  </div>
+
+  <div class="lobby-footer">
+    <button class="btn btn-success" id="btn-start" disabled>▶ Iniciar juego</button>
+    <div style="font-size:12px;color:var(--text2);text-align:center;margin-top:8px;" id="start-hint">Solo el anfitrión puede iniciar</div>
+  </div>
+</div>
+
+<!-- ═══ GAME ═══ -->
+<div id="s-game" class="screen">
+
+  <!-- Vista espectador / adivinador -->
+  <div class="watch-view" id="watch-view">
+    <div class="watch-header">
+      <div class="timer-ring">
+        <svg viewBox="0 0 52 52" width="52" height="52">
+          <circle class="bg" cx="26" cy="26" r="22"/>
+          <circle class="fg" id="timer-ring-fg" cx="26" cy="26" r="22"
+            stroke-dasharray="138.2" stroke-dashoffset="0"/>
+        </svg>
+        <div class="timer-number" id="watch-timer">60</div>
+      </div>
+
+      <div class="turn-info">
+        <div class="turn-team" id="watch-turn-team">—</div>
+        <div class="turn-player" id="watch-turn-player">—</div>
+      </div>
+
+      <div class="score-display">
+        <div class="score-box t1">
+          <div class="score-num" id="score1">0</div>
+          <div class="score-label">E1</div>
+        </div>
+        <div style="color:var(--text2);font-size:16px;">:</div>
+        <div class="score-box t2">
+          <div class="score-num" id="score2">0</div>
+          <div class="score-label">E2</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="emoji-stage">
+      <div class="emoji-display empty" id="watch-emojis">Esperando emojis…</div>
+    </div>
+
+    <div class="watch-footer">
+      <button class="btn btn-success correct-btn" id="btn-correct-watch" style="display:none" onclick="correctGuess()">
+        ✅ ¡Correcto!
+      </button>
+      <div id="watch-hint" style="text-align:center;color:var(--text2);font-size:14px;padding:4px 0;">
+        Tu equipo adivina en voz alta
+      </div>
+    </div>
+  </div>
+
+  <!-- Vista quien da pistas -->
+  <div class="clue-view" id="clue-view" style="display:none">
+    <div class="clue-header">
+      <div class="clue-timer-row">
+        <div class="clue-timer-bar">
+          <div class="clue-timer-fill" id="clue-fill" style="width:100%"></div>
+        </div>
+        <div class="clue-timer-num" id="clue-timer-num">60</div>
+      </div>
+      <div id="clue-word-wrap" style="margin-top:10px;">
+        <!-- Filled by JS: either plain text card or poster card -->
+      </div>
+    </div>
+
+    <!-- Espejo: lo que ven todos -->
+    <div class="emoji-mirror">
+      <div class="mirror-text empty" id="mirror-text">
+        Escribe emojis abajo 👇<br>
+        <span style="font-size:13px">Abre el teclado emoji de tu teléfono</span>
+      </div>
+    </div>
+
+    <!-- Input nativo del teclado -->
+    <div class="emoji-input-wrap">
+      <div class="emoji-input-label">Tus emojis (todos los ven en tiempo real)</div>
+      <div class="emoji-input-row">
+        <textarea id="emoji-input" rows="1" placeholder="😀🎬🏆 escribe aquí…"></textarea>
+        <button class="clear-btn" onclick="clearEmojiInput()" title="Borrar todo">🗑️</button>
+      </div>
+    </div>
+
+    <div class="clue-footer">
+      <button class="btn btn-ghost" onclick="skipWord()">⏭ Pasar</button>
+      <button class="btn btn-success" onclick="correctGuess()">✅ ¡Correcto!</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Overlay rondas -->
+<div class="overlay" id="overlay">
+  <div class="overlay-emoji" id="ov-emoji">🎉</div>
+  <div class="overlay-title" id="ov-title">—</div>
+  <div class="overlay-sub" id="ov-sub">—</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// Metadata visual para cada película infantil (emoji + gradiente)
+const MOVIE_META = {
+  'El Rey León':             { emoji:'🦁',  g:['#C8860A','#8B0000'] },
+  'Toy Story':               { emoji:'🤠',  g:['#1E40AF','#15803D'] },
+  'Toy Story 2':             { emoji:'🚀',  g:['#1E40AF','#7C3AED'] },
+  'Toy Story 3':             { emoji:'🧸',  g:['#DC2626','#1E40AF'] },
+  'Frozen':                  { emoji:'❄️',  g:['#0EA5E9','#1E3A5F'] },
+  'Frozen 2':                { emoji:'🍂',  g:['#D97706','#1E3A5F'] },
+  'Shrek':                   { emoji:'🧅',  g:['#4D7C0F','#92400E'] },
+  'Shrek 2':                 { emoji:'🧪',  g:['#4D7C0F','#7C3AED'] },
+  'Shrek Tercero':           { emoji:'👑',  g:['#4D7C0F','#B45309'] },
+  'Coco':                    { emoji:'💀',  g:['#EA580C','#7E22CE'] },
+  'Moana':                   { emoji:'🌊',  g:['#0369A1','#DC2626'] },
+  'Vaiana':                  { emoji:'🌺',  g:['#0369A1','#DC2626'] },
+  'WALL-E':                  { emoji:'🤖',  g:['#B45309','#1C4532'] },
+  'Up':                      { emoji:'🎈',  g:['#D97706','#0369A1'] },
+  'Buscando a Nemo':         { emoji:'🐠',  g:['#EA580C','#0369A1'] },
+  'Buscando a Dory':         { emoji:'🐟',  g:['#0369A1','#7E22CE'] },
+  'Monsters Inc':            { emoji:'👾',  g:['#7E22CE','#1E40AF'] },
+  'Monsters University':     { emoji:'🎓',  g:['#1D4ED8','#7E22CE'] },
+  'Los Increíbles':          { emoji:'🦸',  g:['#B91C1C','#D97706'] },
+  'Los Increíbles 2':        { emoji:'🦹',  g:['#B91C1C','#1D4ED8'] },
+  'Ratatouille':             { emoji:'🐭',  g:['#7F1D1D','#1C4532'] },
+  'Cars':                    { emoji:'🏎️', g:['#B91C1C','#1E293B'] },
+  'Cars 2':                  { emoji:'🌍',  g:['#B91C1C','#1E3A5F'] },
+  'Brave':                   { emoji:'🏹',  g:['#15803D','#1E3A5F'] },
+  'Mérida Valiente':         { emoji:'🏹',  g:['#15803D','#B45309'] },
+  'Encanto':                 { emoji:'🌸',  g:['#D97706','#7E22CE'] },
+  'Luca':                    { emoji:'🦎',  g:['#0EA5E9','#D97706'] },
+  'Soul':                    { emoji:'🎺',  g:['#1E293B','#D97706'] },
+  'Turning Red':             { emoji:'🔴',  g:['#DC2626','#F59E0B'] },
+  'Onward':                  { emoji:'🧝',  g:['#1E40AF','#7E22CE'] },
+  'Inside Out':              { emoji:'😊',  g:['#D97706','#1D4ED8'] },
+  'Inside Out 2':            { emoji:'😤',  g:['#EA580C','#D97706'] },
+  'Lightyear':               { emoji:'🚀',  g:['#1E3A5F','#0EA5E9'] },
+  'Elemental':               { emoji:'🔥',  g:['#EA580C','#0EA5E9'] },
+  'Wish':                    { emoji:'⭐',  g:['#7E22CE','#1E3A5F'] },
+  'Blancanieves':            { emoji:'🍎',  g:['#DC2626','#D97706'] },
+  'Cenicienta':              { emoji:'👠',  g:['#0EA5E9','#D97706'] },
+  'La Bella y la Bestia':    { emoji:'🌹',  g:['#D97706','#7F1D1D'] },
+  'La Sirenita':             { emoji:'🧜‍♀️',g:['#0369A1','#15803D'] },
+  'Alicia en el País de las Maravillas':{ emoji:'🐇', g:['#7E22CE','#DC2626'] },
+  'Mulan':                   { emoji:'🏮',  g:['#DC2626','#D97706'] },
+  'Aladdin':                 { emoji:'🧞',  g:['#1D4ED8','#D97706'] },
+  'Hércules':                { emoji:'⚡',  g:['#1D4ED8','#D97706'] },
+  'Tarzán':                  { emoji:'🦍',  g:['#15803D','#92400E'] },
+  'Pocahontas':              { emoji:'🍃',  g:['#0F766E','#DC2626'] },
+  'Bambi':                   { emoji:'🦌',  g:['#15803D','#92400E'] },
+  'Dumbo':                   { emoji:'🐘',  g:['#DB2777','#0369A1'] },
+  'Pinocho':                 { emoji:'🪵',  g:['#D97706','#15803D'] },
+  'Peter Pan':               { emoji:'🧚',  g:['#15803D','#1E3A5F'] },
+  'La Bella Durmiente':      { emoji:'🌹',  g:['#7E22CE','#DB2777'] },
+  'El Libro de la Selva':    { emoji:'🐍',  g:['#15803D','#92400E'] },
+  'El Jorobado de Notre Dame':{ emoji:'🔔', g:['#1E293B','#7E22CE'] },
+  'Enredados':               { emoji:'💜',  g:['#7E22CE','#D97706'] },
+  'Rapunzel':                { emoji:'🌸',  g:['#7E22CE','#D97706'] },
+  'Zootopia':                { emoji:'🦊',  g:['#DC2626','#1D4ED8'] },
+  'Big Hero 6':              { emoji:'🤖',  g:['#1D4ED8','#0EA5E9'] },
+  'Tiana y el Sapo':         { emoji:'🐸',  g:['#15803D','#D97706'] },
+  'Kung Fu Panda':           { emoji:'🐼',  g:['#DC2626','#1E293B'] },
+  'Kung Fu Panda 2':         { emoji:'🥊',  g:['#DC2626','#7E22CE'] },
+  'Kung Fu Panda 3':         { emoji:'🌟',  g:['#DC2626','#15803D'] },
+  'Madagascar':              { emoji:'🦁',  g:['#15803D','#D97706'] },
+  'Madagascar 2':            { emoji:'🦒',  g:['#D97706','#DC2626'] },
+  'Los Pingüinos de Madagascar':{ emoji:'🐧',g:['#1E293B','#0EA5E9'] },
+  'La Era de Hielo':         { emoji:'🦣',  g:['#0EA5E9','#92400E'] },
+  'La Era de Hielo 2':       { emoji:'💧',  g:['#0EA5E9','#1E293B'] },
+  'La Era de Hielo 3':       { emoji:'🦕',  g:['#D97706','#0EA5E9'] },
+  'Los Croods':              { emoji:'🦴',  g:['#D97706','#DC2626'] },
+  'Los Croods 2':            { emoji:'🌺',  g:['#15803D','#D97706'] },
+  'Gru: Mi Villano Favorito':{ emoji:'🌙',  g:['#D97706','#7E22CE'] },
+  'Gru 2':                   { emoji:'🍌',  g:['#D97706','#DC2626'] },
+  'Gru 3':                   { emoji:'🦹',  g:['#7E22CE','#D97706'] },
+  'Cómo Entrenar a tu Dragón':{ emoji:'🐉', g:['#1E293B','#DC2626'] },
+  'Cómo Entrenar a tu Dragón 2':{ emoji:'🔥',g:['#1E293B','#0EA5E9'] },
+  'El Príncipe de Egipto':   { emoji:'🐍',  g:['#D97706','#B45309'] },
+  'Lilo y Stitch':           { emoji:'👽',  g:['#1D4ED8','#DC2626'] },
+  'Bolt':                    { emoji:'🐶',  g:['#1D4ED8','#DC2626'] },
+  'El Planeta del Tesoro':   { emoji:'🏴‍☠️',g:['#1E293B','#D97706'] },
+  'Atlantis':                { emoji:'🌊',  g:['#0369A1','#7E22CE'] },
+  'El Espantatiburones':     { emoji:'🦈',  g:['#0369A1','#D97706'] },
+  'Paddington':              { emoji:'🐻',  g:['#92400E','#D97706'] },
+  'Paddington 2':            { emoji:'🎨',  g:['#92400E','#DC2626'] },
+  'Matilda':                 { emoji:'📚',  g:['#7E22CE','#DC2626'] },
+  'Stuart Little':           { emoji:'🐭',  g:['#1D4ED8','#15803D'] },
+  'Charlie y la Fábrica de Chocolate':{ emoji:'🍫',g:['#92400E','#7E22CE'] },
+  'La Historia Sin Fin':     { emoji:'🐉',  g:['#1E3A5F','#15803D'] },
+  'Mi Vecino Totoro':        { emoji:'🌳',  g:['#15803D','#0EA5E9'] },
+  'El Viaje de Chihiro':     { emoji:'🏮',  g:['#DC2626','#1E293B'] },
+  'El Castillo Ambulante':   { emoji:'🏰',  g:['#1E293B','#D97706'] },
+  'La Princesa Mononoke':    { emoji:'🐺',  g:['#15803D','#1E293B'] },
+  'Nausicaä del Valle del Viento':{ emoji:'🌿',g:['#15803D','#0EA5E9'] },
+  'Oliver y su Pandilla':    { emoji:'🐕',  g:['#D97706','#DC2626'] },
+  'Babe el Cerdito Valiente':{ emoji:'🐷',  g:['#DB2777','#15803D'] },
+  'Detective Pikachu':       { emoji:'⚡',  g:['#D97706','#DC2626'] },
+  'Sonic la Película':       { emoji:'💨',  g:['#1D4ED8','#DC2626'] },
+  'Sonic la Película 2':     { emoji:'💎',  g:['#1D4ED8','#DC2626'] },
+  'Los Minions':             { emoji:'🟡',  g:['#D97706','#1D4ED8'] },
+  'El Origen de los Guardianes':{ emoji:'🎅',g:['#1D4ED8','#D97706'] },
+};
+
+const DEFAULT_META = { emoji: '🎬', g: ['#6d28d9', '#1e40af'] };
+
+function getMovieMeta(title) {
+  return MOVIE_META[title] || DEFAULT_META;
+}
+
+const socket = io();
+
+const state = {
+  playerId: null, room: null,
+  isHost: false, isClueGiver: false,
+  timeLeft: 60,
+};
+
+// ── Socket events ──
+
+socket.on('roomReady', ({ room, playerId }) => {
+  state.playerId = playerId;
+  state.room = room;
+  state.isHost = room.players.find(p => p.id === playerId)?.isHost ?? false;
+  renderLobby();
+  showScreen('s-lobby');
+});
+
+socket.on('joinError', msg => showError(msg));
+
+socket.on('playerUpdate', ({ room }) => {
+  state.room = room;
+  if (document.getElementById('s-lobby').classList.contains('active')) renderLobby();
+});
+
+socket.on('youAreHost', () => {
+  state.isHost = true;
+  if (document.getElementById('s-lobby').classList.contains('active')) renderLobby();
+  else updateHostControls();
+});
+
+socket.on('newTurn', ({ room }) => {
+  state.room = room;
+  state.isClueGiver = room.currentPlayer === state.playerId;
+  clearOverlay();
+  showScreen('s-game');
+
+  if (state.isClueGiver) {
+    showClueView();
+  } else {
+    showWatchView();
+  }
+
+  updateScores(room.scores);
+  updateTurnInfo(room);
+  updateTimerDisplay(60);
+  // Clear displays
+  setWatchEmojis('');
+  setMirror('');
+  document.getElementById('emoji-input').value = '';
+});
+
+socket.on('yourWord', ({ word, category }) => {
+  renderWordCard(word, category);
+});
+
+socket.on('emojiTextUpdate', ({ text }) => {
+  setWatchEmojis(text);
+});
+
+socket.on('timerTick', ({ timeLeft }) => {
+  state.timeLeft = timeLeft;
+  updateTimerDisplay(timeLeft);
+});
+
+socket.on('roundWon', ({ word, team, scores }) => {
+  const color = team === 1 ? '#ff6b35' : '#00b4d8';
+  showOverlay('🎉', `¡Punto para Equipo ${team}!`, `Era: "${word}"`, color);
+  updateScores(scores);
+});
+
+socket.on('timeUp', ({ word }) => {
+  showOverlay('⏰', '¡Se acabó el tiempo!', `Era: "${word}"`);
+});
+
+socket.on('wordSkipped', ({ word }) => {
+  showOverlay('⏭', 'Palabra saltada', `Era: "${word}"`);
+});
+
+// ── UI helpers ──
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function renderLobby() {
+  const room = state.room;
+  document.getElementById('lobby-code').textContent = room.code;
+  const catNames = { both: '🎬 Todo – Películas y series', movies: '🎥 Solo películas', series: '📺 Solo series' };
+  document.getElementById('lobby-cat').textContent = catNames[room.category] || '';
+  document.getElementById('display-url').textContent = `${location.origin}/display.html?room=${room.code}`;
+
+  [1, 2].forEach(t => {
+    const el = document.getElementById(`team${t}-players`);
+    const players = room.players.filter(p => p.team == t);
+    el.innerHTML = players.map(p => `
+      <div class="player-chip">
+        <span>${p.name}</span>
+        ${p.isHost ? '<span class="host-badge">👑</span>' : ''}
+        ${p.id === state.playerId ? '<span class="you-badge">tú</span>' : ''}
+      </div>
+    `).join('') || '<div style="font-size:12px;color:var(--text2);padding:4px 0">Sin jugadores</div>';
+  });
+
+  const startBtn = document.getElementById('btn-start');
+  const hint = document.getElementById('start-hint');
+  if (state.isHost) {
+    startBtn.disabled = false;
+    hint.textContent = `${room.players.length} jugador(es) – tú eres el anfitrión`;
+  } else {
+    startBtn.disabled = true;
+    hint.textContent = 'Esperando al anfitrión…';
+  }
+}
+
+function showClueView() {
+  document.getElementById('watch-view').style.display = 'none';
+  document.getElementById('clue-view').style.display = 'flex';
+  // Auto-focus emoji input so keyboard opens
+  setTimeout(() => document.getElementById('emoji-input').focus(), 300);
+}
+
+function showWatchView() {
+  document.getElementById('clue-view').style.display = 'none';
+  document.getElementById('watch-view').style.display = 'flex';
+  updateHostControls();
+}
+
+function updateHostControls() {
+  const showCorrect = state.isHost;
+  document.getElementById('btn-correct-watch').style.display = showCorrect ? 'block' : 'none';
+  document.getElementById('watch-hint').style.display = showCorrect ? 'none' : 'block';
+}
+
+function setWatchEmojis(text) {
+  const el = document.getElementById('watch-emojis');
+  if (!text) {
+    el.className = 'emoji-display empty';
+    el.textContent = 'Esperando emojis…';
+  } else {
+    el.className = 'emoji-display';
+    el.textContent = text;
+  }
+}
+
+function setMirror(text) {
+  const el = document.getElementById('mirror-text');
+  if (!text) {
+    el.className = 'mirror-text empty';
+    el.innerHTML = 'Escribe emojis abajo 👇<br><span style="font-size:13px">Abre el teclado emoji de tu teléfono</span>';
+  } else {
+    el.className = 'mirror-text';
+    el.textContent = text;
+  }
+}
+
+function updateTimerDisplay(t) {
+  document.getElementById('watch-timer').textContent = t;
+  const circ = document.getElementById('timer-ring-fg');
+  const pct = t / 60;
+  circ.style.strokeDashoffset = (1 - pct) * 138.2;
+  const color = t > 20 ? '#06d6a0' : t > 10 ? '#ffd166' : '#ef233c';
+  circ.style.stroke = color;
+  document.getElementById('clue-timer-num').textContent = t;
+  document.getElementById('clue-fill').style.width = (pct * 100) + '%';
+  document.getElementById('clue-fill').style.background = color;
+  document.getElementById('watch-timer').style.color = color;
+}
+
+function updateScores(scores) {
+  document.getElementById('score1').textContent = scores[1];
+  document.getElementById('score2').textContent = scores[2];
+}
+
+function updateTurnInfo(room) {
+  const clueGiver = room.players.find(p => p.id === room.currentPlayer);
+  const teamLabel = room.currentTeam === 1 ? '🟠 Equipo 1' : '🔵 Equipo 2';
+  const el = document.getElementById('watch-turn-team');
+  el.textContent = teamLabel;
+  el.style.color = room.currentTeam === 1 ? 'var(--t1)' : 'var(--t2)';
+  document.getElementById('watch-turn-player').textContent =
+    clueGiver ? (clueGiver.id === state.playerId ? '👉 Tú das las pistas' : `${clueGiver.name} da pistas`) : '';
+}
+
+// ── Word card ──
+
+function renderWordCard(word, category) {
+  const wrap = document.getElementById('clue-word-wrap');
+  if (category === 'infantiles') {
+    const meta = getMovieMeta(word);
+    wrap.innerHTML = `
+      <div class="movie-poster" style="background:linear-gradient(135deg,${meta.g[0]},${meta.g[1]})">
+        <div class="poster-cat">🧸 Película Infantil</div>
+        <div class="poster-emoji">${meta.emoji}</div>
+        <div class="poster-title">${word}</div>
+      </div>`;
+  } else {
+    const icon = category === 'series' ? '📺' : '🎬';
+    const label = category === 'series' ? 'Serie' : 'Película';
+    wrap.innerHTML = `
+      <div style="background:var(--accent-dim);border:2px solid var(--accent);border-radius:10px;padding:12px 14px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${icon} ${label}</div>
+        <div style="font-size:22px;font-weight:900;line-height:1.2">${word}</div>
+      </div>`;
+  }
+}
+
+// ── Emoji input ──
+
+const emojiInput = document.getElementById('emoji-input');
+
+emojiInput.addEventListener('input', () => {
+  const text = emojiInput.value;
+  setMirror(text);
+  socket.emit('updateEmojiText', { text });
+  // Auto-resize textarea
+  emojiInput.style.height = 'auto';
+  emojiInput.style.height = Math.min(emojiInput.scrollHeight, 120) + 'px';
+});
+
+function clearEmojiInput() {
+  emojiInput.value = '';
+  emojiInput.style.height = 'auto';
+  setMirror('');
+  socket.emit('updateEmojiText', { text: '' });
+  emojiInput.focus();
+}
+
+// ── Game actions ──
+
+function correctGuess() { socket.emit('correctGuess'); }
+function skipWord() { socket.emit('skipWord'); }
+function setTeam(team) { socket.emit('setTeam', { team }); }
+
+// ── Home ──
+
+let selectedCategory = 'both';
+
+document.querySelectorAll('.cat-card').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-card').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedCategory = btn.dataset.cat;
+  });
+});
+
+document.getElementById('btn-create').addEventListener('click', () => {
+  const name = document.getElementById('player-name').value.trim();
+  if (!name) { showError('Escribe tu nombre'); return; }
+  clearError();
+  socket.emit('createRoom', { name, category: selectedCategory });
+});
+
+document.getElementById('btn-join').addEventListener('click', joinRoom);
+document.getElementById('join-code').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+
+function joinRoom() {
+  const name = document.getElementById('player-name').value.trim();
+  const code = document.getElementById('join-code').value.trim();
+  if (!name) { showError('Escribe tu nombre primero'); return; }
+  if (code.length < 4) { showError('Escribe el código de sala'); return; }
+  clearError();
+  socket.emit('joinRoom', { code, name });
+}
+
+document.getElementById('btn-start').addEventListener('click', () => socket.emit('startGame'));
+
+function showError(msg) { document.getElementById('home-error').textContent = msg; }
+function clearError() { document.getElementById('home-error').textContent = ''; }
+
+// ── Overlay ──
+
+function showOverlay(emoji, title, sub, color) {
+  document.getElementById('ov-emoji').textContent = emoji;
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-title').style.color = color || 'var(--text)';
+  document.getElementById('ov-sub').textContent = sub;
+  document.getElementById('overlay').classList.add('show');
+}
+function clearOverlay() { document.getElementById('overlay').classList.remove('show'); }
+</script>
+</body>
+</html>

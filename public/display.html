@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📺 Charadas con Emojis – Pantalla</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0e17;
+      --surface: #1a1929;
+      --surface2: #252438;
+      --t1: #ff6b35;
+      --t2: #00b4d8;
+      --accent: #a855f7;
+      --text: #fffffe;
+      --text2: #a7a9be;
+      --success: #06d6a0;
+      --danger: #ef233c;
+    }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    /* ─── JOIN SCREEN ─── */
+    #s-join {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; gap: 24px; padding: 40px;
+      background: radial-gradient(ellipse at center, #1e1b3a 0%, var(--bg) 70%);
+    }
+    #s-join h1 { font-size: 48px; }
+    #s-join p { font-size: 20px; color: var(--text2); }
+    #s-join input {
+      font-size: 36px; font-weight: 900; letter-spacing: 8px; text-align: center;
+      text-transform: uppercase; background: var(--surface); border: 3px solid var(--accent);
+      color: var(--text); border-radius: 16px; padding: 16px 32px; outline: none; width: 300px;
+    }
+    #s-join button {
+      font-size: 20px; font-weight: 700; padding: 16px 48px;
+      background: var(--accent); color: #fff; border: none; border-radius: 12px; cursor: pointer;
+    }
+    .err { color: var(--danger); font-size: 16px; }
+
+    /* ─── DISPLAY SCREEN ─── */
+    #s-display { display: none; height: 100vh; flex-direction: column; }
+
+    /* Top bar */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 40px; background: var(--surface); flex-shrink: 0;
+    }
+
+    .score-panel { display: flex; align-items: center; gap: 16px; }
+    .score-card {
+      text-align: center; padding: 10px 24px; border-radius: 12px;
+      background: var(--surface2);
+    }
+    .score-card.active { transform: scale(1.08); }
+    .score-card.t1 { border-bottom: 4px solid var(--t1); }
+    .score-card.t2 { border-bottom: 4px solid var(--t2); }
+    .score-team { font-size: 14px; font-weight: 700; }
+    .score-card.t1 .score-team { color: var(--t1); }
+    .score-card.t2 .score-team { color: var(--t2); }
+    .score-pts { font-size: 52px; font-weight: 900; line-height: 1; }
+
+    .vs { font-size: 28px; color: var(--text2); }
+
+    /* Timer */
+    .timer-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .timer-big {
+      font-size: 80px; font-weight: 900; line-height: 1;
+      transition: color 0.5s;
+      font-variant-numeric: tabular-nums;
+    }
+    .timer-bar-wrap { width: 200px; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .timer-bar { height: 100%; background: var(--success); border-radius: 4px; transition: width 1s linear, background 0.5s; }
+
+    /* Turn badge */
+    .turn-badge {
+      font-size: 18px; font-weight: 700; padding: 8px 20px; border-radius: 30px;
+      background: var(--surface2);
+    }
+
+    /* Room code */
+    .room-code-badge {
+      font-size: 13px; color: var(--text2); text-align: center;
+    }
+    .room-code-badge strong { color: var(--accent); font-size: 22px; letter-spacing: 4px; display: block; }
+
+    /* Emoji stage */
+    .emoji-stage {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      padding: 40px; overflow: hidden;
+    }
+    .emoji-big {
+      font-size: 100px; line-height: 1.2; text-align: center;
+      word-break: break-all;
+      animation: none;
+    }
+    .emoji-big.updated { animation: pulse 0.3s ease; }
+    @keyframes pulse { 0%{transform:scale(1)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
+    .emoji-waiting { font-size: 24px; color: var(--text2); text-align: center; }
+
+    /* Player bar */
+    .player-bar {
+      padding: 16px 40px; background: var(--surface); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; gap: 20px;
+    }
+    .player-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border-radius: 20px; background: var(--surface2);
+      font-size: 14px; font-weight: 600;
+    }
+    .player-chip.active-t1 { background: rgba(255,107,53,0.2); border: 2px solid var(--t1); }
+    .player-chip.active-t2 { background: rgba(0,180,216,0.2); border: 2px solid var(--t2); }
+    .player-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot-t1 { background: var(--t1); }
+    .dot-t2 { background: var(--t2); }
+
+    /* Overlay */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 50; gap: 20px;
+    }
+    .overlay.show { display: flex; }
+    .ov-emoji { font-size: 120px; animation: pop 0.5s ease; }
+    @keyframes pop { 0%{transform:scale(0)} 70%{transform:scale(1.15)} 100%{transform:scale(1)} }
+    .ov-title { font-size: 52px; font-weight: 900; }
+    .ov-sub { font-size: 24px; color: var(--text2); }
+
+    /* Lobby display */
+    #s-lobby-display {
+      display: none; height: 100vh; flex-direction: column;
+      align-items: center; justify-content: center; gap: 32px; padding: 40px;
+    }
+    .lobby-display-code { font-size: 80px; font-weight: 900; letter-spacing: 12px; color: var(--accent); }
+    .lobby-display-label { font-size: 22px; color: var(--text2); }
+    .lobby-display-url { font-size: 18px; color: var(--text2); margin-top: -16px; }
+    .lobby-display-players { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .lobby-player-chip {
+      padding: 10px 20px; border-radius: 30px; background: var(--surface);
+      font-size: 16px; font-weight: 600;
+      border: 2px solid transparent;
+    }
+    .lobby-player-chip.t1 { border-color: var(--t1); color: var(--t1); }
+    .lobby-player-chip.t2 { border-color: var(--t2); color: var(--t2); }
+  </style>
+</head>
+<body>
+
+<!-- JOIN -->
+<div id="s-join">
+  <h1>🎭</h1>
+  <p>Pantalla compartida · TV / Chromecast</p>
+  <input type="text" id="room-input" placeholder="ABCD1" maxlength="5" autofocus>
+  <button onclick="joinDisplay()">Conectar a sala</button>
+  <div class="err" id="join-err"></div>
+</div>
+
+<!-- LOBBY DISPLAY -->
+<div id="s-lobby-display">
+  <div class="lobby-display-label">Únete en</div>
+  <div class="lobby-display-url" id="ld-url"></div>
+  <div class="lobby-display-code" id="ld-code">—</div>
+  <div class="lobby-display-label">Jugadores conectados</div>
+  <div class="lobby-display-players" id="ld-players"></div>
+</div>
+
+<!-- GAME DISPLAY -->
+<div id="s-display">
+  <div class="top-bar">
+    <div class="score-panel">
+      <div class="score-card t1" id="sc1">
+        <div class="score-team">🟠 Equipo 1</div>
+        <div class="score-pts" id="d-score1">0</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="score-card t2" id="sc2">
+        <div class="score-team">🔵 Equipo 2</div>
+        <div class="score-pts" id="d-score2">0</div>
+      </div>
+    </div>
+
+    <div class="timer-center">
+      <div class="timer-big" id="d-timer">60</div>
+      <div class="timer-bar-wrap">
+        <div class="timer-bar" id="d-timer-bar" style="width:100%"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+      <div class="turn-badge" id="d-turn">—</div>
+      <div class="room-code-badge">
+        <span>Sala</span>
+        <strong id="d-code">—</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="emoji-stage">
+    <div class="emoji-big" id="d-emojis"></div>
+    <div class="emoji-waiting" id="d-waiting">⏳ Esperando emojis…</div>
+  </div>
+
+  <div class="player-bar" id="d-players"></div>
+</div>
+
+<!-- Overlay -->
+<div class="overlay" id="overlay">
+  <div class="ov-emoji" id="ov-emoji">🎉</div>
+  <div class="ov-title" id="ov-title">—</div>
+  <div class="ov-sub" id="ov-sub">—</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let room = null;
+
+// Auto-join from URL param
+const params = new URLSearchParams(location.search);
+const autoCode = params.get('room');
+if (autoCode) {
+  document.getElementById('room-input').value = autoCode.toUpperCase();
+  setTimeout(joinDisplay, 300);
+}
+
+function joinDisplay() {
+  const code = document.getElementById('room-input').value.trim().toUpperCase();
+  if (!code) return;
+  socket.emit('joinDisplay', { code });
+}
+
+document.getElementById('room-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') joinDisplay();
+});
+
+socket.on('joinError', msg => {
+  document.getElementById('join-err').textContent = msg;
+});
+
+socket.on('displayReady', ({ room: r }) => {
+  room = r;
+  document.getElementById('s-join').style.display = 'none';
+  if (r.state === 'lobby') {
+    showLobbyDisplay(r);
+  } else {
+    showGameDisplay(r);
+  }
+});
+
+socket.on('playerUpdate', ({ room: r }) => {
+  room = r;
+  if (r.state === 'lobby') showLobbyDisplay(r);
+});
+
+socket.on('newTurn', ({ room: r }) => {
+  room = r;
+  clearOverlay();
+  showGameDisplay(r);
+  updateScores(r.scores);
+  updateTurnInfo(r);
+  setEmojis([]);
+  updateTimer(60);
+});
+
+socket.on('emojiTextUpdate', ({ text }) => {
+  setEmojis(text);
+});
+
+socket.on('timerTick', ({ timeLeft }) => {
+  updateTimer(timeLeft);
+});
+
+socket.on('roundWon', ({ word, team, scores }) => {
+  const color = team === 1 ? '#ff6b35' : '#00b4d8';
+  showOverlay('🎉', `¡Punto para Equipo ${team}!`, `Era: "${word}"`, color);
+  updateScores(scores);
+});
+
+socket.on('timeUp', ({ word }) => {
+  showOverlay('⏰', '¡Tiempo!', `Era: "${word}"`);
+});
+
+socket.on('wordSkipped', ({ word }) => {
+  showOverlay('⏭', 'Saltada', `Era: "${word}"`);
+});
+
+function showLobbyDisplay(r) {
+  document.getElementById('s-lobby-display').style.display = 'flex';
+  document.getElementById('s-display').style.display = 'none';
+  document.getElementById('ld-code').textContent = r.code;
+  document.getElementById('ld-url').textContent = `${location.origin}`;
+  renderLobbyPlayers(r);
+}
+
+function renderLobbyPlayers(r) {
+  const el = document.getElementById('ld-players');
+  el.innerHTML = r.players.map(p => `
+    <div class="lobby-player-chip t${p.team || 1}">${p.name}</div>
+  `).join('');
+}
+
+function showGameDisplay(r) {
+  document.getElementById('s-lobby-display').style.display = 'none';
+  document.getElementById('s-display').style.display = 'flex';
+  document.getElementById('d-code').textContent = r.code;
+  updateScores(r.scores);
+  updateTurnInfo(r);
+  setEmojis(r.emojis || []);
+}
+
+function setEmojis(emojis) {
+  const el = document.getElementById('d-emojis');
+  const waiting = document.getElementById('d-waiting');
+  if (!emojis || emojis.length === 0) {
+    el.style.display = 'none';
+    waiting.style.display = 'block';
+  } else {
+    waiting.style.display = 'none';
+    el.style.display = 'block';
+    el.textContent = emojis.join('');
+    el.classList.remove('updated');
+    void el.offsetWidth;
+    el.classList.add('updated');
+  }
+}
+
+function updateTimer(t) {
+  document.getElementById('d-timer').textContent = t;
+  document.getElementById('d-timer').style.color =
+    t > 20 ? 'var(--success)' : t > 10 ? '#ffd166' : 'var(--danger)';
+  document.getElementById('d-timer-bar').style.width = (t / 60 * 100) + '%';
+  document.getElementById('d-timer-bar').style.background =
+    t > 20 ? 'var(--success)' : t > 10 ? '#ffd166' : 'var(--danger)';
+}
+
+function updateScores(scores) {
+  document.getElementById('d-score1').textContent = scores[1];
+  document.getElementById('d-score2').textContent = scores[2];
+}
+
+function updateTurnInfo(r) {
+  const clueGiver = r.players.find(p => p.id === r.currentPlayer);
+  const teamName = r.currentTeam === 1 ? '🟠 Equipo 1' : '🔵 Equipo 2';
+  document.getElementById('d-turn').textContent =
+    clueGiver ? `${teamName} · ${clueGiver.name} da pistas` : teamName;
+  document.getElementById('d-turn').style.color =
+    r.currentTeam === 1 ? 'var(--t1)' : 'var(--t2)';
+
+  document.getElementById('sc1').classList.toggle('active', r.currentTeam === 1);
+  document.getElementById('sc2').classList.toggle('active', r.currentTeam === 2);
+
+  const playersEl = document.getElementById('d-players');
+  playersEl.innerHTML = r.players.map(p => {
+    const isCurrent = p.id === r.currentPlayer;
+    const cls = isCurrent ? `active-t${p.team}` : '';
+    const dot = `dot-t${p.team}`;
+    return `<div class="player-chip ${cls}">
+      <span class="dot ${dot}"></span>
+      ${p.name}${isCurrent ? ' 🎭' : ''}
+    </div>`;
+  }).join('');
+}
+
+function showOverlay(emoji, title, sub, color) {
+  document.getElementById('ov-emoji').textContent = emoji;
+  document.getElementById('ov-title').textContent = title;
+  document.getElementById('ov-title').style.color = color || 'var(--text)';
+  document.getElementById('ov-sub').textContent = sub;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function clearOverlay() {
+  document.getElementById('overlay').classList.remove('show');
+}
+</script>
+</body>
+</html>
