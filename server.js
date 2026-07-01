@@ -349,8 +349,6 @@ function startTurn(room, forcedPid = null) {
   }
   if (!clueGiver) return;
 
-  // Update current team to match whoever was picked
-  room.currentTeam = clueGiver.team;
   room.currentPlayer = clueGiver.pid;
 
   const { word, image } = popWord(room);
