@@ -241,23 +241,8 @@
 
   <div class="card" style="display:flex;flex-direction:column;gap:12px;">
     <h2>Crear sala · Elige categoría</h2>
-    <div class="cat-grid">
-      <button class="cat-card selected" data-cat="both">
-        <div class="cat-card-img" style="background:linear-gradient(135deg,#6d28d9,#2563eb)">🎬</div>
-        <div class="cat-card-body"><div class="cat-card-name">Todo</div><div class="cat-card-sub">Películas + Series</div></div>
-      </button>
-      <button class="cat-card" data-cat="movies">
-        <div class="cat-card-img" style="background:linear-gradient(135deg,#b91c1c,#d97706)">🎥</div>
-        <div class="cat-card-body"><div class="cat-card-name">Películas</div><div class="cat-card-sub">Solo películas</div></div>
-      </button>
-      <button class="cat-card" data-cat="series">
-        <div class="cat-card-img" style="background:linear-gradient(135deg,#0369a1,#0891b2)">📺</div>
-        <div class="cat-card-body"><div class="cat-card-name">Series</div><div class="cat-card-sub">Solo series</div></div>
-      </button>
-      <button class="cat-card" data-cat="infantiles">
-        <div class="cat-card-img" style="background:linear-gradient(135deg,#f59e0b,#ec4899,#8b5cf6)">🧸</div>
-        <div class="cat-card-body"><div class="cat-card-name">Infantiles</div><div class="cat-card-sub">Disney · Pixar · Studio Ghibli</div></div>
-      </button>
+    <div class="cat-grid" id="cat-grid">
+      <div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:20px;font-size:13px">Cargando categorías…</div>
     </div>
     <button class="btn btn-primary" id="btn-create">✨ Crear sala</button>
   </div>
@@ -758,13 +743,51 @@ function setTeam(team) { socket.emit('setTeam', { team }); }
 
 let selectedCategory = 'both';
 
-document.querySelectorAll('.cat-card').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.cat-card').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    selectedCategory = btn.dataset.cat;
-  });
-});
+const CAT_FALLBACK = {
+  both:       { emoji: '🎬', g: 'linear-gradient(135deg,#6d28d9,#2563eb)' },
+  movies:     { emoji: '🎥', g: 'linear-gradient(135deg,#b91c1c,#d97706)' },
+  series:     { emoji: '📺', g: 'linear-gradient(135deg,#0369a1,#0891b2)' },
+  infantiles: { emoji: '🧸', g: 'linear-gradient(135deg,#f59e0b,#ec4899,#8b5cf6)' },
+};
+
+async function loadCategoryGrid() {
+  const grid = document.getElementById('cat-grid');
+  try {
+    const cats = await fetch('/api/categories').then(r => r.json());
+    grid.innerHTML = cats.map((c, i) => {
+      const fb = CAT_FALLBACK[c.id] || { emoji: '📁', g: 'linear-gradient(135deg,#4b5563,#1f2937)' };
+      const imgHtml = c.image
+        ? `<img src="${c.image}" style="width:100%;height:100%;object-fit:cover;border-radius:0"
+             onerror="this.style.display='none';this.parentElement.style.background='${fb.g}';this.parentElement.innerHTML='<span>${fb.emoji}</span>'">`
+        : `<span>${fb.emoji}</span>`;
+      const sub = c.combined ? 'Películas + Series' : `${c.wordCount} palabras`;
+      return `
+        <button class="cat-card ${i === 0 ? 'selected' : ''}" data-cat="${c.id}">
+          <div class="cat-card-img" style="background:${c.image ? '#000' : fb.g}">${imgHtml}</div>
+          <div class="cat-card-body">
+            <div class="cat-card-name">${c.name}</div>
+            <div class="cat-card-sub">${sub}</div>
+          </div>
+        </button>`;
+    }).join('');
+
+    // Bind clicks
+    grid.querySelectorAll('.cat-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.cat-card').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedCategory = btn.dataset.cat;
+      });
+    });
+
+    // Default to first category
+    if (cats.length) selectedCategory = cats[0].id;
+  } catch {
+    grid.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:10px">Error cargando categorías</div>';
+  }
+}
+
+loadCategoryGrid();
 
 document.getElementById('btn-create').addEventListener('click', () => {
   const name = document.getElementById('player-name').value.trim();
