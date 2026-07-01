@@ -265,25 +265,46 @@
     .picker-score { text-align: center; }
     .picker-score-num { font-size: 38px; font-weight: 900; }
     .picker-score-lbl { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
-    .picker-teams { padding: 10px 14px 30px; display: flex; flex-direction: column; gap: 16px; }
-    .picker-team-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .picker-players { display: flex; flex-direction: column; gap: 8px; }
-    .picker-player {
-      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-      border-radius: 14px; border: 2px solid transparent; cursor: pointer;
-      background: var(--surface); transition: all 0.15s; font-size: 16px; font-weight: 700;
-      -webkit-tap-highlight-color: transparent;
+    /* Scores in picker */
+    .picker-scoreboard {
+      display: flex; justify-content: center; align-items: center; gap: 0;
+      margin: 18px 20px 0; border-radius: 16px; overflow: hidden; border: 2px solid var(--surface2);
     }
-    .picker-player:active { transform: scale(0.97); }
-    .picker-player.suggested { border-color: var(--accent); background: var(--accent-dim); }
-    .picker-player.t1 { border-color: var(--t1-dim); }
-    .picker-player.t1:active, .picker-player.t1:hover { background: var(--t1-dim); border-color: var(--t1); }
-    .picker-player.t2 { border-color: var(--t2-dim); }
-    .picker-player.t2:active, .picker-player.t2:hover { background: var(--t2-dim); border-color: var(--t2); }
-    .picker-player-icon { font-size: 26px; }
-    .picker-offline { opacity: 0.4; pointer-events: none; }
-    .picker-auto { text-align: center; font-size: 12px; color: var(--text2); padding: 0 20px 10px; }
+    .picker-team-score {
+      flex: 1; padding: 16px 12px; text-align: center;
+    }
+    .picker-team-score.t1 { background: rgba(255,107,53,0.12); border-right: 2px solid var(--surface2); }
+    .picker-team-score.t2 { background: rgba(0,180,216,0.12); }
+    .pts-num { font-size: 52px; font-weight: 900; line-height: 1; }
+    .pts-num.t1 { color: var(--t1); }
+    .pts-num.t2 { color: var(--t2); }
+    .pts-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    .pts-words { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+    /* Claim turn button */
+    .claim-section { padding: 24px 20px 10px; }
+    .btn-claim {
+      width: 100%; padding: 22px 16px; border: none; border-radius: 18px;
+      background: var(--accent); color: #fff; font-size: 22px; font-weight: 900;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s, opacity 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+    }
+    .btn-claim:active { transform: scale(0.96); opacity: 0.9; }
+    .suggested-tag {
+      text-align: center; font-size: 13px; color: var(--text2); margin-top: 10px;
+    }
+    .suggested-tag strong { color: var(--text); }
+
+    .picker-auto { text-align: center; font-size: 12px; color: var(--text2); padding: 10px 20px 20px; }
     .picker-countdown { font-weight: 700; color: var(--accent); }
+
+    /* Scores in watch header — bigger */
+    .score-num { font-size: 28px !important; font-weight: 900; }
+
+    /* Team pick buttons on home */
+    .active-team { opacity: 1 !important; }
+    .team-pick:not(.active-team), .team-pick-join:not(.active-team) { opacity: 0.45; }
 
     /* Duration buttons */
     .dur-btn {
@@ -308,35 +329,40 @@
   <div class="logo-title">Charadas con Emojis</div>
   <div class="logo-sub">¡Explica películas y series solo con emojis!</div>
 
-  <!-- Rejoin card: shown if there's a saved session -->
+  <!-- Rejoin card -->
   <div class="card" id="rejoin-card" style="display:none;border:2px solid var(--accent);background:var(--accent-dim);">
     <h2 style="color:var(--accent)">🎮 Partida en curso</h2>
-    <div style="font-size:14px;color:var(--text2);margin:10px 0 4px">Sala <strong id="rejoin-code" style="color:var(--accent);letter-spacing:3px;font-size:18px">—</strong></div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Jugando como <strong id="rejoin-name" style="color:var(--text)">—</strong></div>
+    <div style="font-size:14px;color:var(--text2);margin:10px 0 14px">Sala <strong id="rejoin-code" style="color:var(--accent);letter-spacing:3px;font-size:18px">—</strong></div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" style="flex:1" onclick="doRejoin()">▶ Volver a la sala</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doRejoin()">▶ Volver</button>
       <button class="btn btn-ghost" style="flex:1" onclick="dismissRejoin()">Nueva partida</button>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Tu nombre</h2>
-    <input type="text" id="player-name" placeholder="¿Cómo te llamas?" maxlength="20" autocomplete="off">
-  </div>
-
+  <!-- Crear sala -->
   <div class="card" style="display:flex;flex-direction:column;gap:12px;">
     <h2>Crear sala · Elige categoría</h2>
     <div class="cat-grid" id="cat-grid">
-      <div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:20px;font-size:13px">Cargando categorías…</div>
+      <div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:20px;font-size:13px">Cargando…</div>
+    </div>
+    <!-- Team picker for creator -->
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-t1 team-pick active-team" data-team="1" style="flex:1;font-size:14px" onclick="pickTeam(1,this)">🟠 Equipo 1</button>
+      <button class="btn btn-ghost team-pick" data-team="2" style="flex:1;font-size:14px" onclick="pickTeam(2,this)">🔵 Equipo 2</button>
     </div>
     <button class="btn btn-primary" id="btn-create">✨ Crear sala</button>
   </div>
 
   <div class="divider">o únete con código</div>
 
+  <!-- Unirse -->
   <div class="card" style="display:flex;flex-direction:column;gap:10px;">
     <input type="text" id="join-code" placeholder="Código de sala" maxlength="5"
       style="text-transform:uppercase;letter-spacing:3px;text-align:center;font-size:22px;font-weight:800;">
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-t1 team-pick-join active-team" data-team="1" style="flex:1;font-size:13px" onclick="pickTeamJoin(1,this)">🟠 Equipo 1</button>
+      <button class="btn btn-ghost team-pick-join" data-team="2" style="flex:1;font-size:13px" onclick="pickTeamJoin(2,this)">🔵 Equipo 2</button>
+    </div>
     <button class="btn btn-ghost" id="btn-join">🔗 Unirse</button>
   </div>
 
@@ -503,19 +529,31 @@
 <div id="turn-picker">
   <div class="picker-header">
     <div class="picker-title">¿Quién da las pistas?</div>
-    <div class="picker-sub">Tocá un jugador para empezar su turno</div>
-    <div class="picker-scores">
-      <div class="picker-score">
-        <div class="picker-score-num" style="color:var(--t1)" id="pk-score1">0</div>
-        <div class="picker-score-lbl">🟠 Equipo 1</div>
-      </div>
-      <div class="picker-score">
-        <div class="picker-score-num" style="color:var(--t2)" id="pk-score2">0</div>
-        <div class="picker-score-lbl">🔵 Equipo 2</div>
-      </div>
+    <div class="picker-sub">Tocá el botón en tu dispositivo</div>
+  </div>
+
+  <!-- Marcador grande -->
+  <div class="picker-scoreboard">
+    <div class="picker-team-score t1">
+      <div class="pts-num t1" id="pk-score1">0</div>
+      <div class="pts-label">🟠 Equipo 1</div>
+      <div class="pts-words" id="pk-words1"></div>
+    </div>
+    <div class="picker-team-score t2">
+      <div class="pts-num t2" id="pk-score2">0</div>
+      <div class="pts-label">🔵 Equipo 2</div>
+      <div class="pts-words" id="pk-words2"></div>
     </div>
   </div>
-  <div class="picker-teams" id="picker-teams"></div>
+
+  <!-- Botón principal -->
+  <div class="claim-section">
+    <button class="btn-claim" onclick="claimTurn()">
+      🎭 ¡Soy yo! — Empezar mi turno
+    </button>
+    <div class="suggested-tag" id="suggested-tag"></div>
+  </div>
+
   <div class="picker-auto">Auto-inicio en <span class="picker-countdown" id="picker-countdown">25</span>s</div>
 </div>
 
@@ -832,45 +870,32 @@ let pickerSecondsLeft = 25;
 socket.on('turnPicker', ({ players, suggestedTeam, scores }) => {
   clearOverlay();
   if (scores) updateScores(scores);
-  showTurnPicker(players, suggestedTeam, scores);
+  showTurnPicker(suggestedTeam, scores);
 });
 
-function showTurnPicker(players, suggestedTeam, scores) {
-  const picker = document.getElementById('turn-picker');
-  const teamsEl = document.getElementById('picker-teams');
-
+function showTurnPicker(suggestedTeam, scores) {
   if (scores) {
     document.getElementById('pk-score1').textContent = scores[1] ?? 0;
     document.getElementById('pk-score2').textContent = scores[2] ?? 0;
+    // Word count progress
+    const room = state.room;
+    if (room?.wordQueueIndex !== undefined) {
+      document.getElementById('pk-words1').textContent = '';
+      document.getElementById('pk-words2').textContent = '';
+    }
   }
 
-  const t1 = players.filter(p => p.team === 1);
-  const t2 = players.filter(p => p.team === 2);
-
-  function renderTeam(players, team) {
-    if (!players.length) return '';
-    const color = team === 1 ? 'var(--t1)' : 'var(--t2)';
-    const label = team === 1 ? '🟠 Equipo 1' : '🔵 Equipo 2';
-    const isSuggested = team === suggestedTeam;
-    return `
-      <div>
-        <div class="picker-team-title" style="color:${color}">${label}${isSuggested ? ' · <span style="color:var(--accent);font-size:11px">sugerido</span>' : ''}</div>
-        <div class="picker-players">
-          ${players.map(p => `
-            <button class="picker-player t${team}${isSuggested ? ' suggested' : ''}"
-              onclick="pickPlayer('${p.pid}')">
-              <span class="picker-player-icon">${team === 1 ? '🟠' : '🔵'}</span>
-              <span>${esc(p.name)}</span>
-              ${p.pid === state.playerId ? '<span style="font-size:11px;color:var(--text2);margin-left:auto">(tú)</span>' : ''}
-            </button>`).join('')}
-        </div>
-      </div>`;
+  const tag = document.getElementById('suggested-tag');
+  if (suggestedTeam) {
+    const color = suggestedTeam === 1 ? 'var(--t1)' : 'var(--t2)';
+    const label = suggestedTeam === 1 ? '🟠 Equipo 1' : '🔵 Equipo 2';
+    tag.innerHTML = `Turno sugerido: <strong style="color:${color}">${label}</strong>`;
+  } else {
+    tag.textContent = '';
   }
 
-  teamsEl.innerHTML = renderTeam(t1, 1) + renderTeam(t2, 2);
-  picker.classList.add('show');
+  document.getElementById('turn-picker').classList.add('show');
 
-  // Countdown
   if (pickerTimer) clearInterval(pickerTimer);
   pickerSecondsLeft = 25;
   document.getElementById('picker-countdown').textContent = pickerSecondsLeft;
@@ -887,8 +912,8 @@ function hideTurnPicker() {
   if (pickerTimer) { clearInterval(pickerTimer); pickerTimer = null; }
 }
 
-function pickPlayer(pid) {
-  socket.emit('selectPlayer', { pid });
+function claimTurn() {
+  socket.emit('claimTurn');
   hideTurnPicker();
 }
 
@@ -987,21 +1012,22 @@ function toggleCast() {
 function renderLobby() {
   const room = state.room;
   document.getElementById('lobby-code').textContent = room.code;
-  const catNames = { both: '🎬 Todo – Películas y series', movies: '🎥 Solo películas', series: '📺 Solo series' };
+  const catNames = { both: '🎬 Todo', movies: '🎥 Películas', series: '📺 Series' };
   document.getElementById('lobby-cat').textContent = catNames[room.category] || room.category || '';
   document.getElementById('display-url').textContent = `${location.origin}/display.html?room=${room.code}`;
 
   [1, 2].forEach(t => {
     const el = document.getElementById(`team${t}-players`);
     const players = room.players.filter(p => p.team == t);
-    el.innerHTML = players.map(p => `
-      <div class="player-chip" style="${p.connected === false ? 'opacity:0.4' : ''}">
-        <span>${p.name}</span>
-        ${p.isHost ? '<span class="host-badge">👑</span>' : ''}
-        ${p.id === state.playerId ? '<span class="you-badge">tú</span>' : ''}
-        ${p.connected === false ? '<span style="font-size:10px;color:var(--danger)">⚡</span>' : ''}
-      </div>
-    `).join('') || '<div style="font-size:12px;color:var(--text2);padding:4px 0">Sin jugadores</div>';
+    const connected = players.filter(p => p.connected !== false).length;
+    const isMyTeam = room.players.find(p => p.id === state.playerId)?.team == t;
+    el.innerHTML = players.length
+      ? `<div class="player-chip" style="${connected < players.length ? 'opacity:0.7' : ''}">
+           <span>${connected} dispositivo${connected !== 1 ? 's' : ''}</span>
+           ${isMyTeam ? '<span class="you-badge">tú</span>' : ''}
+           ${players.some(p => p.isHost && p.id === state.playerId) ? '<span class="host-badge">👑</span>' : ''}
+         </div>`
+      : '<div style="font-size:12px;color:var(--text2);padding:4px 0">Sin dispositivos</div>';
   });
 
   const startBtn = document.getElementById('btn-start');
@@ -1009,7 +1035,7 @@ function renderLobby() {
   const timerCfg = document.getElementById('timer-config');
   if (state.isHost) {
     startBtn.disabled = false;
-    hint.textContent = `${room.players.length} jugador(es) – tú eres el anfitrión`;
+    hint.textContent = `${room.players.length} dispositivo(s) conectado(s)`;
     if (timerCfg) timerCfg.style.display = 'block';
   } else {
     startBtn.disabled = true;
@@ -1213,6 +1239,19 @@ function setTeam(team) { socket.emit('setTeam', { team }); }
 // ── Home ──
 
 let selectedCategory = 'both';
+let selectedTeam = 1;
+let selectedTeamJoin = 1;
+
+function pickTeam(t, btn) {
+  selectedTeam = t;
+  document.querySelectorAll('.team-pick').forEach(b => b.classList.remove('active-team'));
+  btn.classList.add('active-team');
+}
+function pickTeamJoin(t, btn) {
+  selectedTeamJoin = t;
+  document.querySelectorAll('.team-pick-join').forEach(b => b.classList.remove('active-team'));
+  btn.classList.add('active-team');
+}
 
 const CAT_FALLBACK = {
   both:       { emoji: '🎬', g: 'linear-gradient(135deg,#6d28d9,#2563eb)' },
@@ -1261,26 +1300,20 @@ async function loadCategoryGrid() {
 loadCategoryGrid();
 
 document.getElementById('btn-create').addEventListener('click', () => {
-  const name = document.getElementById('player-name').value.trim();
-  if (!name) { showError('Escribe tu nombre'); return; }
   clearError();
-  state.playerName = name;
-  saveSession('', name);
-  socket.emit('createRoom', { name, pid: MY_PID, category: selectedCategory });
+  saveSession('', 'E' + selectedTeam);
+  socket.emit('createRoom', { pid: MY_PID, category: selectedCategory, team: selectedTeam });
 });
 
 document.getElementById('btn-join').addEventListener('click', joinRoom);
 document.getElementById('join-code').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
 
 function joinRoom() {
-  const name = document.getElementById('player-name').value.trim();
   const code = document.getElementById('join-code').value.trim();
-  if (!name) { showError('Escribe tu nombre primero'); return; }
   if (code.length < 4) { showError('Escribe el código de sala'); return; }
   clearError();
-  state.playerName = name;
-  saveSession(code.toUpperCase(), name);
-  socket.emit('joinRoom', { code, name, pid: MY_PID });
+  saveSession(code.toUpperCase(), 'E' + selectedTeamJoin);
+  socket.emit('joinRoom', { code, pid: MY_PID, team: selectedTeamJoin });
 }
 
 document.getElementById('btn-start').addEventListener('click', () => socket.emit('startGame', { duration: selectedDuration }));

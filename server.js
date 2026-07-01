@@ -44,13 +44,23 @@ function getWords(categoryId) {
   return (cat.words || []).map(norm);
 }
 
-function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
-function getWord(categoryId) {
-  const words = getWords(categoryId);
-  if (!words.length) return { word: '???', image: '' };
-  const item = getRandom(words);
-  return { word: item.title, image: item.image || '' };
+// Per-room word queue — no repeats until all words are used
+function popWord(room) {
+  if (!room.wordQueue || room.wordQueueIndex >= room.wordQueue.length) {
+    room.wordQueue = shuffleArray(getWords(room.category));
+    room.wordQueueIndex = 0;
+  }
+  const item = room.wordQueue[room.wordQueueIndex++];
+  return { word: item?.title || '???', image: item?.image || '' };
 }
 
 // ── Admin Auth ────────────────────────────────────────────────────
@@ -343,7 +353,7 @@ function startTurn(room, forcedPid = null) {
   room.currentTeam = clueGiver.team;
   room.currentPlayer = clueGiver.pid;
 
-  const { word, image } = getWord(room.category);
+  const { word, image } = popWord(room);
   room.currentWord  = word;
   room.currentImage = image;
   room.emojiText    = '';
@@ -373,7 +383,7 @@ function startTurn(room, forcedPid = null) {
 io.on('connection', (socket) => {
 
   // ── Create room ──────────────────────────────────────────────────
-  socket.on('createRoom', ({ name, pid, category }) => {
+  socket.on('createRoom', ({ name, pid, category, team }) => {
     let code; do { code = generateCode(); } while (rooms.has(code));
     const room = {
       code, category: category || 'both',
@@ -386,7 +396,8 @@ io.on('connection', (socket) => {
       pickTimer: null,
     };
     rooms.set(code, room);
-    room.players.push({ pid, socketId: socket.id, name, team: 1, isHost: true, connected: true, disconnectTimer: null });
+    const playerName = (name || '').trim() || 'Dispositivo';
+    room.players.push({ pid, socketId: socket.id, name: playerName, team: parseInt(team) || 1, isHost: true, connected: true, disconnectTimer: null });
     socket.join(code);
     socket.data.roomCode = code;
     socket.data.pid = pid;
@@ -394,7 +405,7 @@ io.on('connection', (socket) => {
   });
 
   // ── Join room ────────────────────────────────────────────────────
-  socket.on('joinRoom', ({ code, name, pid }) => {
+  socket.on('joinRoom', ({ code, name, pid, team }) => {
     const room = rooms.get(code.toUpperCase().trim());
     if (!room) { socket.emit('joinError', 'Sala no encontrada.'); return; }
     if (room.state !== 'lobby') { socket.emit('joinError', 'El juego ya comenzó.'); return; }
@@ -402,7 +413,8 @@ io.on('connection', (socket) => {
     if (room.players.find(p => p.pid === pid)) {
       socket.emit('joinError', 'Ya estás en esta sala. Actualiza la página.'); return;
     }
-    room.players.push({ pid, socketId: socket.id, name, team: 1, isHost: false, connected: true, disconnectTimer: null });
+    const joinName = (name || '').trim() || 'Dispositivo';
+    room.players.push({ pid, socketId: socket.id, name: joinName, team: parseInt(team) || 1, isHost: false, connected: true, disconnectTimer: null });
     socket.join(room.code);
     socket.data.roomCode = room.code;
     socket.data.pid = pid;
@@ -474,8 +486,19 @@ io.on('connection', (socket) => {
     const p = room.players.find(p => p.pid === socket.data.pid);
     if (!p?.isHost) return;
     room.turnDuration = Math.min(Math.max(parseInt(duration) || 60, 15), 300);
+    // Shuffle word queue for the whole game
+    room.wordQueue = shuffleArray(getWords(room.category));
+    room.wordQueueIndex = 0;
     room.state = 'playing';
-    emitTurnPicker(room); // Show picker before first turn
+    emitTurnPicker(room);
+  });
+
+  // Any player can volunteer themselves as the clue giver
+  socket.on('claimTurn', () => {
+    const room = rooms.get(socket.data.roomCode); if (!room) return;
+    if (room.state !== 'picking') return;
+    if (!room.players.find(p => p.pid === socket.data.pid)) return;
+    startTurn(room, socket.data.pid);
   });
 
   // ── Turn picker ──────────────────────────────────────────────────
