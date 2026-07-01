@@ -27,7 +27,6 @@ function saveData() {
 
 let data = loadData();
 
-// Normalize: word can be string (no image) or {title, image}
 function norm(w) {
   return typeof w === 'string' ? { title: w, image: '' } : { title: w.title || '', image: w.image || '' };
 }
@@ -105,7 +104,6 @@ app.delete('/api/categories/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Add words: accepts [{title, image}] or ["string"]
 app.post('/api/categories/:id/words', adminAuth, (req, res) => {
   const cat = getCategory(req.params.id);
   if (!cat || cat.combined) return res.status(400).json({ error: 'Categoría inválida' });
@@ -116,7 +114,6 @@ app.post('/api/categories/:id/words', adminAuth, (req, res) => {
   const added = [];
   for (const w of incoming) {
     if (!existingTitles.has(w.title)) {
-      // Store as string if no image (saves space), as object if has image
       cat.words.push(w.image ? w : w.title);
       added.push(w.title);
       existingTitles.add(w.title);
@@ -126,7 +123,6 @@ app.post('/api/categories/:id/words', adminAuth, (req, res) => {
   res.json({ added, total: cat.words.length });
 });
 
-// Update a word's title and/or image
 app.put('/api/categories/:id/words', adminAuth, (req, res) => {
   const cat = getCategory(req.params.id);
   if (!cat || cat.combined) return res.status(400).json({ error: 'Categoría inválida' });
@@ -139,7 +135,6 @@ app.put('/api/categories/:id/words', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Delete words by title array
 app.delete('/api/categories/:id/words', adminAuth, (req, res) => {
   const cat = getCategory(req.params.id);
   if (!cat || cat.combined) return res.status(400).json({ error: 'Categoría inválida' });
@@ -162,7 +157,6 @@ app.post('/api/scrape', adminAuth, async (req, res) => {
   }
 });
 
-// Upgrade IMDB thumbnail to full poster
 function fixImgUrl(url) {
   if (!url) return '';
   if (url.includes('media-amazon.com')) {
@@ -185,8 +179,6 @@ async function scrapeUrl(url) {
   const $ = cheerio.load(resp.data);
   let results = [];
 
-  // ── Strategy 1: IMDB list items (new design) ──────────────────
-  // Each movie is in a <li class="ipc-metadata-list-summary-item">
   $('li.ipc-metadata-list-summary-item, li[class*="list-summary-item"]').each((_, li) => {
     const titleEl = $(li).find('h4.ipc-title__text, h3.ipc-title__text').first();
     const imgEl   = $(li).find('img[class*="ipc-image"], img.ipc-image').first();
@@ -195,7 +187,6 @@ async function scrapeUrl(url) {
     if (title.length > 1 && title.length < 150) results.push({ title, image });
   });
 
-  // ── Strategy 2: IMDB old design ──────────────────────────────
   if (!results.length) {
     $('.lister-item').each((_, item) => {
       const title = $(item).find('.lister-item-header a').first().text().trim();
@@ -204,7 +195,6 @@ async function scrapeUrl(url) {
     });
   }
 
-  // ── Strategy 3: JSON-LD (schema.org) ─────────────────────────
   if (!results.length) {
     $('script[type="application/ld+json"]').each((_, el) => {
       try {
@@ -221,19 +211,17 @@ async function scrapeUrl(url) {
     });
   }
 
-  // ── Strategy 4: __NEXT_DATA__ (Next.js) ──────────────────────
   if (!results.length) {
     const m = resp.data.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     if (m) {
       try {
-        const found = new Map(); // title → image
+        const found = new Map();
         walkNextData(JSON.parse(m[1]), found);
         results = [...found.entries()].map(([title, image]) => ({ title, image }));
       } catch {}
     }
   }
 
-  // ── Strategy 5: Generic CSS ───────────────────────────────────
   if (!results.length) {
     const titleSels = ['h3.ipc-title__text', '.titleColumn a', 'h2 a', 'h3 a', 'ol li a'];
     for (const sel of titleSels) {
@@ -271,29 +259,80 @@ function generateCode() {
   return c;
 }
 
+// Player: { pid, socketId, name, team, isHost, connected, disconnectTimer }
+// pid = persistent client-generated ID; socketId = current socket (changes on reconnect)
+
 function sanitizeRoom(room) {
   return {
-    code: room.code, category: room.category,
-    players: room.players.map(p => ({ id: p.id, name: p.name, team: p.team, isHost: p.isHost })),
-    scores: room.scores, state: room.state,
-    currentTeam: room.currentTeam, currentPlayer: room.currentPlayer,
-    emojiText: room.emojiText, timeLeft: room.timeLeft,
+    code: room.code,
+    category: room.category,
+    players: room.players.map(p => ({
+      id: p.pid,             // clients use pid as their stable identity
+      name: p.name,
+      team: p.team,
+      isHost: p.isHost,
+      connected: p.connected,
+    })),
+    scores: room.scores,
+    state: room.state,
+    currentTeam: room.currentTeam,
+    currentPlayer: room.currentPlayer, // pid of clue giver
+    emojiText: room.emojiText,
+    timeLeft: room.timeLeft,
   };
 }
 
-function startTurn(room) {
-  const pool = room.players.filter(p => p.team == room.currentTeam);
-  const clueGiver = (pool.length > 0 ? pool : room.players)[Math.floor(Math.random() * (pool.length || room.players.length))];
+// Emit turn picker to the room (called after every round ends)
+function emitTurnPicker(room) {
+  room.state = 'picking';
+  if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
+
+  const connected = room.players.filter(p => p.connected);
+  io.to(room.code).emit('turnPicker', {
+    players: connected.map(p => ({ pid: p.pid, name: p.name, team: p.team })),
+    suggestedTeam: room.currentTeam,
+    scores: room.scores,
+  });
+
+  // Auto-start after 25 seconds if nobody picks
+  if (room.pickTimer) clearTimeout(room.pickTimer);
+  room.pickTimer = setTimeout(() => {
+    if (room.state === 'picking') startTurn(room);
+  }, 25000);
+}
+
+function startTurn(room, forcedPid = null) {
+  if (room.pickTimer) { clearTimeout(room.pickTimer); room.pickTimer = null; }
+  room.state = 'playing';
+
+  let clueGiver = null;
+  if (forcedPid) {
+    clueGiver = room.players.find(p => p.pid === forcedPid && p.connected);
+  }
+  if (!clueGiver) {
+    const pool = room.players.filter(p => p.team === room.currentTeam && p.connected);
+    clueGiver = pool[Math.floor(Math.random() * pool.length)];
+  }
+  if (!clueGiver) {
+    clueGiver = room.players.find(p => p.connected);
+  }
   if (!clueGiver) return;
-  room.currentPlayer = clueGiver.id;
+
+  // Update current team to match whoever was picked
+  room.currentTeam = clueGiver.team;
+  room.currentPlayer = clueGiver.pid;
+
   const { word, image } = getWord(room.category);
   room.currentWord  = word;
   room.currentImage = image;
-  room.emojiText = '';
-  room.timeLeft  = 60;
+  room.emojiText    = '';
+  room.timeLeft     = 60;
 
   io.to(room.code).emit('newTurn', { room: sanitizeRoom(room) });
-  io.to(room.currentPlayer).emit('yourWord', { word, image, category: room.category });
+
+  // Send word only to the clue giver's current socket
+  const clueSocket = [...io.sockets.sockets.values()].find(s => s.data.pid === clueGiver.pid && s.data.roomCode === room.code);
+  if (clueSocket) clueSocket.emit('yourWord', { word, image, category: room.category });
 
   if (room.timerInterval) clearInterval(room.timerInterval);
   room.timerInterval = setInterval(() => {
@@ -302,88 +341,186 @@ function startTurn(room) {
     if (room.timeLeft <= 0) {
       clearInterval(room.timerInterval); room.timerInterval = null;
       io.to(room.code).emit('timeUp', { word: room.currentWord });
-      setTimeout(() => { room.currentTeam = room.currentTeam === 1 ? 2 : 1; startTurn(room); }, 3500);
+      // Switch to opposing team suggestion, then show picker
+      room.currentTeam = room.currentTeam === 1 ? 2 : 1;
+      setTimeout(() => emitTurnPicker(room), 3000);
     }
   }, 1000);
 }
 
+// ── Socket.io ─────────────────────────────────────────────────────
+
 io.on('connection', (socket) => {
-  socket.on('createRoom', ({ name, category }) => {
+
+  // ── Create room ──────────────────────────────────────────────────
+  socket.on('createRoom', ({ name, pid, category }) => {
     let code; do { code = generateCode(); } while (rooms.has(code));
     const room = {
-      code, category: category || 'both', players: [], scores: { 1: 0, 2: 0 },
-      state: 'lobby', currentTeam: 1, currentPlayer: null,
-      currentWord: null, currentImage: '', emojiText: '', timerInterval: null, timeLeft: 0,
+      code, category: category || 'both',
+      players: [],
+      scores: { 1: 0, 2: 0 },
+      state: 'lobby',
+      currentTeam: 1, currentPlayer: null,
+      currentWord: null, currentImage: '',
+      emojiText: '', timerInterval: null, timeLeft: 0,
+      pickTimer: null,
     };
     rooms.set(code, room);
-    room.players.push({ id: socket.id, name, team: 1, isHost: true });
-    socket.join(code); socket.data.roomCode = code;
-    socket.emit('roomReady', { room: sanitizeRoom(room), playerId: socket.id });
+    room.players.push({ pid, socketId: socket.id, name, team: 1, isHost: true, connected: true, disconnectTimer: null });
+    socket.join(code);
+    socket.data.roomCode = code;
+    socket.data.pid = pid;
+    socket.emit('roomReady', { room: sanitizeRoom(room), playerId: pid });
   });
 
-  socket.on('joinRoom', ({ code, name }) => {
+  // ── Join room ────────────────────────────────────────────────────
+  socket.on('joinRoom', ({ code, name, pid }) => {
     const room = rooms.get(code.toUpperCase().trim());
     if (!room) { socket.emit('joinError', 'Sala no encontrada.'); return; }
     if (room.state !== 'lobby') { socket.emit('joinError', 'El juego ya comenzó.'); return; }
-    room.players.push({ id: socket.id, name, team: 1, isHost: false });
-    socket.join(room.code); socket.data.roomCode = room.code;
-    socket.emit('roomReady', { room: sanitizeRoom(room), playerId: socket.id });
+    // Avoid duplicates by pid
+    if (room.players.find(p => p.pid === pid)) {
+      socket.emit('joinError', 'Ya estás en esta sala. Actualiza la página.'); return;
+    }
+    room.players.push({ pid, socketId: socket.id, name, team: 1, isHost: false, connected: true, disconnectTimer: null });
+    socket.join(room.code);
+    socket.data.roomCode = room.code;
+    socket.data.pid = pid;
+    socket.emit('roomReady', { room: sanitizeRoom(room), playerId: pid });
     socket.to(room.code).emit('playerUpdate', { room: sanitizeRoom(room) });
   });
 
+  // ── Rejoin after refresh ─────────────────────────────────────────
+  socket.on('rejoinRoom', ({ pid, roomCode }) => {
+    const room = rooms.get(roomCode?.toUpperCase?.());
+    if (!room) { socket.emit('rejoinFailed', 'La sala ya no existe.'); return; }
+    const player = room.players.find(p => p.pid === pid);
+    if (!player) { socket.emit('rejoinFailed', 'Tu sesión expiró en esta sala.'); return; }
+
+    // Cancel pending removal
+    if (player.disconnectTimer) { clearTimeout(player.disconnectTimer); player.disconnectTimer = null; }
+    player.socketId = socket.id;
+    player.connected = true;
+    socket.join(room.code);
+    socket.data.roomCode = room.code;
+    socket.data.pid = pid;
+
+    socket.emit('roomReady', { room: sanitizeRoom(room), playerId: pid });
+    socket.to(room.code).emit('playerUpdate', { room: sanitizeRoom(room) });
+
+    // Restore in-progress game state
+    if (room.state === 'playing') {
+      socket.emit('newTurn', { room: sanitizeRoom(room) });
+      if (room.emojiText) socket.emit('emojiTextUpdate', { text: room.emojiText });
+      if (room.timeLeft > 0) socket.emit('timerTick', { timeLeft: room.timeLeft });
+      // Re-send the word if it's their turn
+      if (room.currentPlayer === pid) {
+        socket.emit('yourWord', { word: room.currentWord, image: room.currentImage, category: room.category });
+      }
+    } else if (room.state === 'picking') {
+      socket.emit('newTurn', { room: sanitizeRoom(room) });
+      const connected = room.players.filter(p => p.connected);
+      socket.emit('turnPicker', {
+        players: connected.map(p => ({ pid: p.pid, name: p.name, team: p.team })),
+        suggestedTeam: room.currentTeam,
+        scores: room.scores,
+      });
+    }
+  });
+
+  // ── Display screen ───────────────────────────────────────────────
   socket.on('joinDisplay', ({ code }) => {
     const room = rooms.get(code.toUpperCase().trim());
     if (!room) { socket.emit('joinError', 'Sala no encontrada.'); return; }
-    socket.join(room.code); socket.data.roomCode = room.code; socket.data.isDisplay = true;
+    socket.join(room.code);
+    socket.data.roomCode = room.code;
+    socket.data.isDisplay = true;
     socket.emit('displayReady', { room: sanitizeRoom(room) });
+    if (room.state === 'playing' && room.emojiText) {
+      socket.emit('emojiTextUpdate', { text: room.emojiText });
+    }
   });
 
+  // ── Lobby actions ────────────────────────────────────────────────
   socket.on('setTeam', ({ team }) => {
     const room = rooms.get(socket.data.roomCode); if (!room) return;
-    const p = room.players.find(p => p.id === socket.id); if (!p) return;
+    const p = room.players.find(p => p.pid === socket.data.pid); if (!p) return;
     p.team = team;
     io.to(room.code).emit('playerUpdate', { room: sanitizeRoom(room) });
   });
 
   socket.on('startGame', () => {
     const room = rooms.get(socket.data.roomCode); if (!room) return;
-    const p = room.players.find(p => p.id === socket.id);
+    const p = room.players.find(p => p.pid === socket.data.pid);
     if (!p?.isHost) return;
-    room.state = 'playing'; startTurn(room);
+    room.state = 'playing';
+    emitTurnPicker(room); // Show picker before first turn
   });
 
+  // ── Turn picker ──────────────────────────────────────────────────
+  socket.on('selectPlayer', ({ pid: targetPid }) => {
+    const room = rooms.get(socket.data.roomCode); if (!room) return;
+    if (room.state !== 'picking') return;
+    // Anyone in the room can pick
+    startTurn(room, targetPid);
+  });
+
+  // ── Emoji text ───────────────────────────────────────────────────
   socket.on('updateEmojiText', ({ text }) => {
     const room = rooms.get(socket.data.roomCode);
-    if (!room || room.currentPlayer !== socket.id) return;
+    if (!room || room.currentPlayer !== socket.data.pid) return;
     room.emojiText = text;
     socket.to(room.code).emit('emojiTextUpdate', { text });
   });
 
+  // ── Correct guess ────────────────────────────────────────────────
   socket.on('correctGuess', () => {
     const room = rooms.get(socket.data.roomCode); if (!room) return;
-    const p = room.players.find(p => p.id === socket.id);
-    if (!p?.isHost && room.currentPlayer !== socket.id) return;
+    const p = room.players.find(p => p.pid === socket.data.pid);
+    if (!p?.isHost && room.currentPlayer !== socket.data.pid) return;
     if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
     room.scores[room.currentTeam]++;
     io.to(room.code).emit('roundWon', { word: room.currentWord, team: room.currentTeam, scores: room.scores });
-    setTimeout(() => { room.currentTeam = room.currentTeam === 1 ? 2 : 1; startTurn(room); }, 3500);
+    // Suggest the other team next, then show picker
+    room.currentTeam = room.currentTeam === 1 ? 2 : 1;
+    setTimeout(() => emitTurnPicker(room), 3000);
   });
 
+  // ── Skip word ────────────────────────────────────────────────────
   socket.on('skipWord', () => {
     const room = rooms.get(socket.data.roomCode);
-    if (!room || room.currentPlayer !== socket.id) return;
+    if (!room || room.currentPlayer !== socket.data.pid) return;
     if (room.timerInterval) { clearInterval(room.timerInterval); room.timerInterval = null; }
     io.to(room.code).emit('wordSkipped', { word: room.currentWord });
-    setTimeout(() => { room.currentTeam = room.currentTeam === 1 ? 2 : 1; startTurn(room); }, 2500);
+    room.currentTeam = room.currentTeam === 1 ? 2 : 1;
+    setTimeout(() => emitTurnPicker(room), 2000);
   });
 
+  // ── Disconnect ───────────────────────────────────────────────────
   socket.on('disconnect', () => {
     if (socket.data.isDisplay) return;
     const room = rooms.get(socket.data.roomCode); if (!room) return;
-    room.players = room.players.filter(p => p.id !== socket.id);
-    if (!room.players.length) { if (room.timerInterval) clearInterval(room.timerInterval); rooms.delete(room.code); return; }
-    if (!room.players.some(p => p.isHost)) room.players[0].isHost = true;
+    const player = room.players.find(p => p.pid === socket.data.pid); if (!player) return;
+
+    player.connected = false;
     io.to(room.code).emit('playerUpdate', { room: sanitizeRoom(room) });
+
+    // Give the player 45 seconds to reconnect before removing them
+    player.disconnectTimer = setTimeout(() => {
+      room.players = room.players.filter(p => p.pid !== player.pid);
+      if (!room.players.length) {
+        if (room.timerInterval) clearInterval(room.timerInterval);
+        if (room.pickTimer) clearTimeout(room.pickTimer);
+        rooms.delete(room.code);
+        return;
+      }
+      // Reassign host if needed
+      if (!room.players.some(p => p.isHost)) {
+        const next = room.players.find(p => p.connected) || room.players[0];
+        if (next) { next.isHost = true; }
+      }
+      io.to(room.code).emit('playerUpdate', { room: sanitizeRoom(room) });
+    }, 45000);
   });
 });
 
@@ -391,5 +528,6 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   const ips = Object.values(require('os').networkInterfaces()).flat().filter(n => n.family === 'IPv4' && !n.internal).map(n => n.address);
   console.log(`\n🎭 Charadas con Emojis → http://localhost:${PORT}`);
+  if (ips.length) console.log(`   Red local         → http://${ips[0]}:${PORT}`);
   console.log(`🔧 Admin             → http://localhost:${PORT}/admin.html  (pass: ${ADMIN_KEY})\n`);
 });

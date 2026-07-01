@@ -213,6 +213,18 @@
     .clue-footer { padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--surface2); display: flex; gap: 8px; flex-shrink: 0; }
     .clue-footer .btn { flex: 1; padding: 14px; font-size: 15px; }
 
+    /* Floating cast button */
+    .fab-cast {
+      position: fixed; bottom: 80px; right: 14px; z-index: 50;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(26,25,41,0.92); border: 1px solid rgba(168,85,247,0.4);
+      display: none; align-items: center; justify-content: center;
+      font-size: 22px; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .fab-cast.visible { display: flex; }
+    .fab-cast:active { transform: scale(0.9); }
+
     /* Overlay */
     .overlay {
       position: fixed; inset: 0; background: rgba(0,0,0,0.88);
@@ -224,6 +236,40 @@
     @keyframes pop { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
     .overlay-title { font-size: 28px; font-weight: 900; }
     .overlay-sub { font-size: 16px; color: var(--text2); }
+
+    /* Turn picker overlay */
+    #turn-picker {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.94);
+      display: none; flex-direction: column;
+      z-index: 110; overflow-y: auto;
+    }
+    #turn-picker.show { display: flex; }
+    .picker-header { padding: 28px 20px 10px; text-align: center; }
+    .picker-title { font-size: 22px; font-weight: 900; margin-bottom: 4px; }
+    .picker-sub { font-size: 14px; color: var(--text2); }
+    .picker-scores { display: flex; justify-content: center; gap: 24px; margin-top: 14px; }
+    .picker-score { text-align: center; }
+    .picker-score-num { font-size: 38px; font-weight: 900; }
+    .picker-score-lbl { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+    .picker-teams { padding: 10px 14px 30px; display: flex; flex-direction: column; gap: 16px; }
+    .picker-team-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .picker-players { display: flex; flex-direction: column; gap: 8px; }
+    .picker-player {
+      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+      border-radius: 14px; border: 2px solid transparent; cursor: pointer;
+      background: var(--surface); transition: all 0.15s; font-size: 16px; font-weight: 700;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .picker-player:active { transform: scale(0.97); }
+    .picker-player.suggested { border-color: var(--accent); background: var(--accent-dim); }
+    .picker-player.t1 { border-color: var(--t1-dim); }
+    .picker-player.t1:active, .picker-player.t1:hover { background: var(--t1-dim); border-color: var(--t1); }
+    .picker-player.t2 { border-color: var(--t2-dim); }
+    .picker-player.t2:active, .picker-player.t2:hover { background: var(--t2-dim); border-color: var(--t2); }
+    .picker-player-icon { font-size: 26px; }
+    .picker-offline { opacity: 0.4; pointer-events: none; }
+    .picker-auto { text-align: center; font-size: 12px; color: var(--text2); padding: 0 20px 10px; }
+    .picker-countdown { font-weight: 700; color: var(--accent); }
   </style>
 </head>
 <body>
@@ -288,10 +334,14 @@
       <button class="btn btn-t2" style="flex:1" onclick="setTeam(2)">🔵 Equipo 2</button>
     </div>
 
-    <div style="background:var(--surface);border-radius:var(--radius);padding:14px;">
-      <div style="font-size:13px;color:var(--text2);margin-bottom:6px;">📺 Pantalla para TV / Chromecast</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.6;">
-        Abre <strong id="display-url" style="color:var(--accent)">—</strong> en Chrome del TV y usa <em>"Transmitir pestaña"</em>.
+    <div style="background:var(--surface);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:13px;color:var(--text2);">📺 Pantalla para TV / Chromecast</div>
+      <button class="btn btn-ghost" style="font-size:14px;padding:12px" onclick="openDisplay()">
+        📺 Abrir pantalla de TV
+      </button>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;text-align:center;">
+        Abre en Chrome del TV y usa <em>"Transmitir pestaña"</em><br>
+        o comparte <strong id="display-url" style="color:var(--accent)">—</strong>
       </div>
     </div>
   </div>
@@ -395,8 +445,51 @@
   <div class="overlay-sub" id="ov-sub">—</div>
 </div>
 
+<!-- Selector de turno -->
+<div id="turn-picker">
+  <div class="picker-header">
+    <div class="picker-title">¿Quién da las pistas?</div>
+    <div class="picker-sub">Tocá un jugador para empezar su turno</div>
+    <div class="picker-scores">
+      <div class="picker-score">
+        <div class="picker-score-num" style="color:var(--t1)" id="pk-score1">0</div>
+        <div class="picker-score-lbl">🟠 Equipo 1</div>
+      </div>
+      <div class="picker-score">
+        <div class="picker-score-num" style="color:var(--t2)" id="pk-score2">0</div>
+        <div class="picker-score-lbl">🔵 Equipo 2</div>
+      </div>
+    </div>
+  </div>
+  <div class="picker-teams" id="picker-teams"></div>
+  <div class="picker-auto">Auto-inicio en <span class="picker-countdown" id="picker-countdown">25</span>s</div>
+</div>
+
+<!-- Botón flotante transmitir -->
+<button class="fab-cast" id="fab-cast" onclick="openDisplay()" title="Abrir pantalla TV">📺</button>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// ── Persistent player ID (survives refresh) ──────────────────────
+function getPid() {
+  let pid = localStorage.getItem('charadas_pid');
+  if (!pid) {
+    pid = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    localStorage.setItem('charadas_pid', pid);
+  }
+  return pid;
+}
+const MY_PID = getPid();
+
+function saveSession(roomCode, playerName) {
+  localStorage.setItem('charadas_room', roomCode);
+  localStorage.setItem('charadas_name', playerName || '');
+}
+function clearSession() {
+  localStorage.removeItem('charadas_room');
+  localStorage.removeItem('charadas_name');
+}
+
 // Metadata visual para cada película infantil (emoji + gradiente)
 const MOVIE_META = {
   'El Rey León':             { emoji:'🦁',  g:['#C8860A','#8B0000'] },
@@ -510,7 +603,15 @@ const state = {
   playerId: null, room: null,
   isHost: false, isClueGiver: false,
   timeLeft: 60,
+  playerName: '',
 };
+
+// ── Try to rejoin on load ────────────────────────────────────────
+const savedRoom = localStorage.getItem('charadas_room');
+const savedName = localStorage.getItem('charadas_name');
+if (savedRoom && savedName) {
+  socket.emit('rejoinRoom', { pid: MY_PID, roomCode: savedRoom });
+}
 
 // ── Socket events ──
 
@@ -518,19 +619,42 @@ socket.on('roomReady', ({ room, playerId }) => {
   state.playerId = playerId;
   state.room = room;
   state.isHost = room.players.find(p => p.id === playerId)?.isHost ?? false;
-  renderLobby();
-  showScreen('s-lobby');
+  hideTurnPicker();
+  clearOverlay();
+
+  // If game already in progress (rejoin mid-game), go straight to game
+  if (room.state === 'playing' || room.state === 'picking') {
+    state.isClueGiver = room.currentPlayer === state.playerId;
+    showScreen('s-game');
+    if (state.isClueGiver) showClueView(); else showWatchView();
+    updateScores(room.scores);
+    updateTurnInfo(room);
+    if (room.timeLeft) updateTimerDisplay(room.timeLeft);
+    showFab();
+  } else {
+    renderLobby();
+    showScreen('s-lobby');
+  }
+
+  // Restore name in input if empty
+  if (savedName && !document.getElementById('player-name').value) {
+    document.getElementById('player-name').value = savedName;
+  }
+  saveSession(room.code, savedName || document.getElementById('player-name').value);
+});
+
+socket.on('rejoinFailed', msg => {
+  clearSession();
+  // Stay on home screen, show nothing (room probably expired)
+  console.log('Rejoin failed:', msg);
 });
 
 socket.on('joinError', msg => showError(msg));
 
 socket.on('playerUpdate', ({ room }) => {
   state.room = room;
-  if (document.getElementById('s-lobby').classList.contains('active')) renderLobby();
-});
-
-socket.on('youAreHost', () => {
-  state.isHost = true;
+  const me = room.players.find(p => p.id === state.playerId);
+  if (me) state.isHost = me.isHost;
   if (document.getElementById('s-lobby').classList.contains('active')) renderLobby();
   else updateHostControls();
 });
@@ -538,19 +662,15 @@ socket.on('youAreHost', () => {
 socket.on('newTurn', ({ room }) => {
   state.room = room;
   state.isClueGiver = room.currentPlayer === state.playerId;
+  hideTurnPicker();
   clearOverlay();
   showScreen('s-game');
+  showFab();
 
-  if (state.isClueGiver) {
-    showClueView();
-  } else {
-    showWatchView();
-  }
-
+  if (state.isClueGiver) showClueView(); else showWatchView();
   updateScores(room.scores);
   updateTurnInfo(room);
   updateTimerDisplay(60);
-  // Clear displays
   setWatchEmojis('');
   setMirror('');
   document.getElementById('emoji-input').value = '';
@@ -562,6 +682,7 @@ socket.on('yourWord', ({ word, category, image }) => {
 
 socket.on('emojiTextUpdate', ({ text }) => {
   setWatchEmojis(text);
+  setMirror(text);
 });
 
 socket.on('timerTick', ({ timeLeft }) => {
@@ -583,6 +704,75 @@ socket.on('wordSkipped', ({ word }) => {
   showOverlay('⏭', 'Palabra saltada', `Era: "${word}"`);
 });
 
+// ── Turn picker ──────────────────────────────────────────────────
+let pickerTimer = null;
+let pickerSecondsLeft = 25;
+
+socket.on('turnPicker', ({ players, suggestedTeam, scores }) => {
+  clearOverlay();
+  if (scores) updateScores(scores);
+  showTurnPicker(players, suggestedTeam, scores);
+});
+
+function showTurnPicker(players, suggestedTeam, scores) {
+  const picker = document.getElementById('turn-picker');
+  const teamsEl = document.getElementById('picker-teams');
+
+  if (scores) {
+    document.getElementById('pk-score1').textContent = scores[1] ?? 0;
+    document.getElementById('pk-score2').textContent = scores[2] ?? 0;
+  }
+
+  const t1 = players.filter(p => p.team === 1);
+  const t2 = players.filter(p => p.team === 2);
+
+  function renderTeam(players, team) {
+    if (!players.length) return '';
+    const color = team === 1 ? 'var(--t1)' : 'var(--t2)';
+    const label = team === 1 ? '🟠 Equipo 1' : '🔵 Equipo 2';
+    const isSuggested = team === suggestedTeam;
+    return `
+      <div>
+        <div class="picker-team-title" style="color:${color}">${label}${isSuggested ? ' · <span style="color:var(--accent);font-size:11px">sugerido</span>' : ''}</div>
+        <div class="picker-players">
+          ${players.map(p => `
+            <button class="picker-player t${team}${isSuggested ? ' suggested' : ''}"
+              onclick="pickPlayer('${p.pid}')">
+              <span class="picker-player-icon">${team === 1 ? '🟠' : '🔵'}</span>
+              <span>${esc(p.name)}</span>
+              ${p.pid === state.playerId ? '<span style="font-size:11px;color:var(--text2);margin-left:auto">(tú)</span>' : ''}
+            </button>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  teamsEl.innerHTML = renderTeam(t1, 1) + renderTeam(t2, 2);
+  picker.classList.add('show');
+
+  // Countdown
+  if (pickerTimer) clearInterval(pickerTimer);
+  pickerSecondsLeft = 25;
+  document.getElementById('picker-countdown').textContent = pickerSecondsLeft;
+  pickerTimer = setInterval(() => {
+    pickerSecondsLeft--;
+    const el = document.getElementById('picker-countdown');
+    if (el) el.textContent = pickerSecondsLeft;
+    if (pickerSecondsLeft <= 0) { clearInterval(pickerTimer); pickerTimer = null; }
+  }, 1000);
+}
+
+function hideTurnPicker() {
+  document.getElementById('turn-picker').classList.remove('show');
+  if (pickerTimer) { clearInterval(pickerTimer); pickerTimer = null; }
+}
+
+function pickPlayer(pid) {
+  socket.emit('selectPlayer', { pid });
+  hideTurnPicker();
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 // ── UI helpers ──
 
 function showScreen(id) {
@@ -590,21 +780,32 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+function showFab() {
+  document.getElementById('fab-cast').classList.add('visible');
+}
+
+function openDisplay() {
+  if (!state.room) return;
+  const url = `${location.origin}/display.html?room=${state.room.code}`;
+  window.open(url, '_blank');
+}
+
 function renderLobby() {
   const room = state.room;
   document.getElementById('lobby-code').textContent = room.code;
   const catNames = { both: '🎬 Todo – Películas y series', movies: '🎥 Solo películas', series: '📺 Solo series' };
-  document.getElementById('lobby-cat').textContent = catNames[room.category] || '';
+  document.getElementById('lobby-cat').textContent = catNames[room.category] || room.category || '';
   document.getElementById('display-url').textContent = `${location.origin}/display.html?room=${room.code}`;
 
   [1, 2].forEach(t => {
     const el = document.getElementById(`team${t}-players`);
     const players = room.players.filter(p => p.team == t);
     el.innerHTML = players.map(p => `
-      <div class="player-chip">
+      <div class="player-chip" style="${p.connected === false ? 'opacity:0.4' : ''}">
         <span>${p.name}</span>
         ${p.isHost ? '<span class="host-badge">👑</span>' : ''}
         ${p.id === state.playerId ? '<span class="you-badge">tú</span>' : ''}
+        ${p.connected === false ? '<span style="font-size:10px;color:var(--danger)">⚡</span>' : ''}
       </div>
     `).join('') || '<div style="font-size:12px;color:var(--text2);padding:4px 0">Sin jugadores</div>';
   });
@@ -816,7 +1017,9 @@ document.getElementById('btn-create').addEventListener('click', () => {
   const name = document.getElementById('player-name').value.trim();
   if (!name) { showError('Escribe tu nombre'); return; }
   clearError();
-  socket.emit('createRoom', { name, category: selectedCategory });
+  state.playerName = name;
+  saveSession('', name);
+  socket.emit('createRoom', { name, pid: MY_PID, category: selectedCategory });
 });
 
 document.getElementById('btn-join').addEventListener('click', joinRoom);
@@ -828,7 +1031,9 @@ function joinRoom() {
   if (!name) { showError('Escribe tu nombre primero'); return; }
   if (code.length < 4) { showError('Escribe el código de sala'); return; }
   clearError();
-  socket.emit('joinRoom', { code, name });
+  state.playerName = name;
+  saveSession(code.toUpperCase(), name);
+  socket.emit('joinRoom', { code, name, pid: MY_PID });
 }
 
 document.getElementById('btn-start').addEventListener('click', () => socket.emit('startGame'));
