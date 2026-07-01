@@ -15,7 +15,9 @@ app.use(express.json());
 
 // ── Data ──────────────────────────────────────────────────────────
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+// DATA_FILE: set env var DATA_FILE to a path on a persistent disk (e.g. Render Disk at /data)
+// to survive redeploys. Otherwise data.json inside the repo resets on each deploy.
+const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 
 function loadData() {
   try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
@@ -142,6 +144,24 @@ app.delete('/api/categories/:id/words', adminAuth, (req, res) => {
   cat.words = cat.words.filter(w => !toRemove.has(norm(w).title));
   saveData();
   res.json({ total: cat.words.length });
+});
+
+// ── Export / Import ───────────────────────────────────────────────
+
+app.get('/api/export', adminAuth, (req, res) => {
+  res.setHeader('Content-Disposition', 'attachment; filename="charadas-data.json"');
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify(data, null, 2));
+});
+
+app.post('/api/import', adminAuth, (req, res) => {
+  const incoming = req.body;
+  if (!incoming?.categories || !Array.isArray(incoming.categories)) {
+    return res.status(400).json({ error: 'Formato inválido. Se espera { categories: [...] }' });
+  }
+  data = incoming;
+  saveData();
+  res.json({ ok: true, categories: data.categories.length });
 });
 
 // ── Scraper ───────────────────────────────────────────────────────
@@ -276,9 +296,10 @@ function sanitizeRoom(room) {
     scores: room.scores,
     state: room.state,
     currentTeam: room.currentTeam,
-    currentPlayer: room.currentPlayer, // pid of clue giver
+    currentPlayer: room.currentPlayer,
     emojiText: room.emojiText,
     timeLeft: room.timeLeft,
+    turnDuration: room.turnDuration || 60,
   };
 }
 
@@ -326,7 +347,7 @@ function startTurn(room, forcedPid = null) {
   room.currentWord  = word;
   room.currentImage = image;
   room.emojiText    = '';
-  room.timeLeft     = 60;
+  room.timeLeft     = room.turnDuration || 60;
 
   io.to(room.code).emit('newTurn', { room: sanitizeRoom(room) });
 
@@ -341,7 +362,6 @@ function startTurn(room, forcedPid = null) {
     if (room.timeLeft <= 0) {
       clearInterval(room.timerInterval); room.timerInterval = null;
       io.to(room.code).emit('timeUp', { word: room.currentWord });
-      // Switch to opposing team suggestion, then show picker
       room.currentTeam = room.currentTeam === 1 ? 2 : 1;
       setTimeout(() => emitTurnPicker(room), 3000);
     }
@@ -449,10 +469,11 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('playerUpdate', { room: sanitizeRoom(room) });
   });
 
-  socket.on('startGame', () => {
+  socket.on('startGame', ({ duration } = {}) => {
     const room = rooms.get(socket.data.roomCode); if (!room) return;
     const p = room.players.find(p => p.pid === socket.data.pid);
     if (!p?.isHost) return;
+    room.turnDuration = Math.min(Math.max(parseInt(duration) || 60, 15), 300);
     room.state = 'playing';
     emitTurnPicker(room); // Show picker before first turn
   });

@@ -278,6 +278,20 @@
     .picker-offline { opacity: 0.4; pointer-events: none; }
     .picker-auto { text-align: center; font-size: 12px; color: var(--text2); padding: 0 20px 10px; }
     .picker-countdown { font-weight: 700; color: var(--accent); }
+
+    /* Duration buttons */
+    .dur-btn {
+      padding: 6px 12px; border: 2px solid var(--surface); border-radius: 8px;
+      background: var(--surface); color: var(--text2); font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.1s; -webkit-tap-highlight-color: transparent;
+    }
+    .dur-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+    /* Emoji-only warning */
+    .emoji-warn {
+      font-size: 11px; color: var(--danger); text-align: center;
+      padding: 3px 0; min-height: 16px; transition: opacity 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -287,6 +301,17 @@
   <div class="logo">🎭</div>
   <div class="logo-title">Charadas con Emojis</div>
   <div class="logo-sub">¡Explica películas y series solo con emojis!</div>
+
+  <!-- Rejoin card: shown if there's a saved session -->
+  <div class="card" id="rejoin-card" style="display:none;border:2px solid var(--accent);background:var(--accent-dim);">
+    <h2 style="color:var(--accent)">🎮 Partida en curso</h2>
+    <div style="font-size:14px;color:var(--text2);margin:10px 0 4px">Sala <strong id="rejoin-code" style="color:var(--accent);letter-spacing:3px;font-size:18px">—</strong></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Jugando como <strong id="rejoin-name" style="color:var(--text)">—</strong></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="doRejoin()">▶ Volver a la sala</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="dismissRejoin()">Nueva partida</button>
+    </div>
+  </div>
 
   <div class="card">
     <h2>Tu nombre</h2>
@@ -355,6 +380,17 @@
   </div>
 
   <div class="lobby-footer">
+    <!-- Timer config: only host sees this -->
+    <div id="timer-config" style="display:none;background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⏱ Tiempo por turno</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="dur-btn active" data-sec="30" onclick="setDuration(30,this)">30s</button>
+        <button class="dur-btn" data-sec="60" onclick="setDuration(60,this)">60s</button>
+        <button class="dur-btn" data-sec="90" onclick="setDuration(90,this)">90s</button>
+        <button class="dur-btn" data-sec="120" onclick="setDuration(120,this)">2 min</button>
+        <button class="dur-btn" data-sec="180" onclick="setDuration(180,this)">3 min</button>
+      </div>
+    </div>
     <button class="btn btn-success" id="btn-start" disabled>▶ Iniciar juego</button>
     <div style="font-size:12px;color:var(--text2);text-align:center;margin-top:8px;" id="start-hint">Solo el anfitrión puede iniciar</div>
   </div>
@@ -433,9 +469,13 @@
     <div class="emoji-input-wrap">
       <div class="emoji-input-label">Tus emojis (todos los ven en tiempo real)</div>
       <div class="emoji-input-row">
-        <textarea id="emoji-input" rows="1" placeholder="😀🎬🏆 escribe aquí…"></textarea>
+        <textarea id="emoji-input" rows="1" placeholder="😀🎬🏆"
+          inputmode="text"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        ></textarea>
         <button class="clear-btn" onclick="clearEmojiInput()" title="Borrar todo">🗑️</button>
       </div>
+      <div class="emoji-warn" id="emoji-warn"></div>
     </div>
 
     <div class="clue-footer">
@@ -620,11 +660,34 @@ const state = {
   playerName: '',
 };
 
-// ── Try to rejoin on load ────────────────────────────────────────
+// ── Rejoin dialog ────────────────────────────────────────────────
 const savedRoom = localStorage.getItem('charadas_room');
 const savedName = localStorage.getItem('charadas_name');
+
 if (savedRoom && savedName) {
+  document.getElementById('rejoin-code').textContent = savedRoom;
+  document.getElementById('rejoin-name').textContent = savedName;
+  document.getElementById('rejoin-card').style.display = 'block';
+  document.getElementById('player-name').value = savedName;
+}
+
+function doRejoin() {
+  document.getElementById('rejoin-card').style.display = 'none';
   socket.emit('rejoinRoom', { pid: MY_PID, roomCode: savedRoom });
+}
+
+function dismissRejoin() {
+  clearSession();
+  document.getElementById('rejoin-card').style.display = 'none';
+}
+
+// ── Turn duration ────────────────────────────────────────────────
+let selectedDuration = 60;
+
+function setDuration(sec, btn) {
+  selectedDuration = sec;
+  document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 }
 
 // ── Socket events ──
@@ -682,9 +745,10 @@ socket.on('newTurn', ({ room }) => {
   showFab();
 
   if (state.isClueGiver) showClueView(); else showWatchView();
+  state.turnDuration = room.turnDuration || 60;
   updateScores(room.scores);
   updateTurnInfo(room);
-  updateTimerDisplay(60);
+  updateTimerDisplay(room.turnDuration || 60);
   setWatchEmojis('');
   setMirror('');
   document.getElementById('emoji-input').value = '';
@@ -899,12 +963,15 @@ function renderLobby() {
 
   const startBtn = document.getElementById('btn-start');
   const hint = document.getElementById('start-hint');
+  const timerCfg = document.getElementById('timer-config');
   if (state.isHost) {
     startBtn.disabled = false;
     hint.textContent = `${room.players.length} jugador(es) – tú eres el anfitrión`;
+    if (timerCfg) timerCfg.style.display = 'block';
   } else {
     startBtn.disabled = true;
     hint.textContent = 'Esperando al anfitrión…';
+    if (timerCfg) timerCfg.style.display = 'none';
   }
 }
 
@@ -950,16 +1017,21 @@ function setMirror(text) {
 }
 
 function updateTimerDisplay(t) {
+  const max = state.turnDuration || 60;
+  const pct = t / max;
+  const warn = max * 0.33; // last 33% turns yellow/red
+  const color = t > warn ? '#06d6a0' : t > warn * 0.5 ? '#ffd166' : '#ef233c';
+
   document.getElementById('watch-timer').textContent = t;
+  document.getElementById('watch-timer').style.color = color;
+
   const circ = document.getElementById('timer-ring-fg');
-  const pct = t / 60;
   circ.style.strokeDashoffset = (1 - pct) * 138.2;
-  const color = t > 20 ? '#06d6a0' : t > 10 ? '#ffd166' : '#ef233c';
   circ.style.stroke = color;
+
   document.getElementById('clue-timer-num').textContent = t;
   document.getElementById('clue-fill').style.width = (pct * 100) + '%';
   document.getElementById('clue-fill').style.background = color;
-  document.getElementById('watch-timer').style.color = color;
 }
 
 function updateScores(scores) {
@@ -1023,17 +1095,62 @@ function catLabel(category) {
   return { both:'Película / Serie', movies:'Película', series:'Serie', infantiles:'🧸 Película Infantil' }[category] || category;
 }
 
+// ── Emoji-only filter ────────────────────────────────────────────
+// Blocks ASCII printable chars (letters, digits, punctuation) and basic Latin extended.
+// Emojis and symbols live above U+024F so they pass through freely.
+function filterEmoji(text) {
+  const out = [];
+  for (const char of text) {          // for…of iterates code points, handles surrogates
+    const cp = char.codePointAt(0);
+    if (cp === 0x20 || cp === 0x0A)  { out.push(' '); continue; } // space / newline → space
+    if (cp <= 0x7E || (cp >= 0xA1 && cp <= 0x024F)) continue;     // block ASCII + Latin extended
+    out.push(char);
+  }
+  return out.join('');
+}
+
+let warnTimer = null;
+function showEmojiWarn() {
+  const el = document.getElementById('emoji-warn');
+  if (!el) return;
+  el.textContent = '⚠️ Solo emojis — el texto fue eliminado';
+  clearTimeout(warnTimer);
+  warnTimer = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
 // ── Emoji input ──
 
 const emojiInput = document.getElementById('emoji-input');
 
 emojiInput.addEventListener('input', () => {
-  const text = emojiInput.value;
-  setMirror(text);
-  socket.emit('updateEmojiText', { text });
-  // Auto-resize textarea
+  const raw = emojiInput.value;
+  const filtered = filterEmoji(raw);
+
+  if (filtered !== raw) {
+    // Preserve cursor: calculate how many chars were removed before cursor
+    const pos = emojiInput.selectionStart;
+    const removed = raw.slice(0, pos).length - filterEmoji(raw.slice(0, pos)).length;
+    emojiInput.value = filtered;
+    const newPos = Math.max(0, pos - removed);
+    emojiInput.setSelectionRange(newPos, newPos);
+    showEmojiWarn();
+  }
+
+  setMirror(filtered);
+  socket.emit('updateEmojiText', { text: filtered });
   emojiInput.style.height = 'auto';
   emojiInput.style.height = Math.min(emojiInput.scrollHeight, 120) + 'px';
+});
+
+// Also filter on paste
+emojiInput.addEventListener('paste', e => {
+  e.preventDefault();
+  const pasted = (e.clipboardData || window.clipboardData).getData('text');
+  const filtered = filterEmoji(pasted);
+  const start = emojiInput.selectionStart, end = emojiInput.selectionEnd;
+  const current = emojiInput.value;
+  emojiInput.value = current.slice(0, start) + filtered + current.slice(end);
+  emojiInput.dispatchEvent(new Event('input'));
 });
 
 function clearEmojiInput() {
@@ -1123,7 +1240,7 @@ function joinRoom() {
   socket.emit('joinRoom', { code, name, pid: MY_PID });
 }
 
-document.getElementById('btn-start').addEventListener('click', () => socket.emit('startGame'));
+document.getElementById('btn-start').addEventListener('click', () => socket.emit('startGame', { duration: selectedDuration }));
 
 function showError(msg) { document.getElementById('home-error').textContent = msg; }
 function clearError() { document.getElementById('home-error').textContent = ''; }

@@ -142,6 +142,10 @@
   <div class="topbar">
     <div class="topbar-title">🔧 Admin · Charadas con Emojis</div>
     <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="exportData()" title="Descargar backup de categorías">⬇ Exportar</button>
+      <label class="btn btn-ghost btn-sm" title="Restaurar desde backup" style="cursor:pointer">
+        ⬆ Importar<input type="file" accept=".json" style="display:none" onchange="importData(this)">
+      </label>
       <a href="/" target="_blank" class="btn btn-ghost btn-sm">🎮 Ver juego</a>
       <button class="btn btn-ghost btn-sm" onclick="logout()">Salir</button>
     </div>
@@ -528,6 +532,35 @@ async function api(method, url, body) {
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY }, body: body ? JSON.stringify(body) : undefined });
     return await r.json();
   } catch(e) { return { error: e.message }; }
+}
+
+// ── Export / Import ───────────────────────────────────────────────
+
+async function exportData() {
+  const r = await fetch('/api/export', { headers: { 'x-admin-key': KEY } });
+  if (!r.ok) { toast('Error al exportar', 'err'); return; }
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `charadas-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('✓ Backup descargado');
+}
+
+async function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  let parsed;
+  try { parsed = JSON.parse(await file.text()); } catch { toast('Archivo JSON inválido', 'err'); return; }
+  if (!confirm(`¿Reemplazar TODAS las categorías con el backup "${file.name}"?\nEsta acción no se puede deshacer.`)) return;
+  const r = await api('POST', '/api/import', parsed);
+  if (r.error) { toast(r.error, 'err'); return; }
+  toast(`✓ Importadas ${r.categories} categorías`);
+  selected = null;
+  await loadCats();
+  document.getElementById('panel').innerHTML = `<div class="empty"><div style="font-size:40px">✅</div><div>Importación completada</div></div>`;
 }
 
 let toastT;
