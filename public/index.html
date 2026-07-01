@@ -556,8 +556,8 @@ socket.on('newTurn', ({ room }) => {
   document.getElementById('emoji-input').value = '';
 });
 
-socket.on('yourWord', ({ word, category }) => {
-  renderWordCard(word, category);
+socket.on('yourWord', ({ word, category, image }) => {
+  renderWordCard(word, category, image || '');
 });
 
 socket.on('emojiTextUpdate', ({ text }) => {
@@ -691,25 +691,48 @@ function updateTurnInfo(room) {
 
 // ── Word card ──
 
-function renderWordCard(word, category) {
+function renderWordCard(word, category, image) {
   const wrap = document.getElementById('clue-word-wrap');
-  if (category === 'infantiles') {
-    const meta = getMovieMeta(word);
+
+  // Si hay imagen del poster, mostrarla grande con título encima
+  if (image) {
     wrap.innerHTML = `
-      <div class="movie-poster" style="background:linear-gradient(135deg,${meta.g[0]},${meta.g[1]})">
-        <div class="poster-cat">🧸 Película Infantil</div>
-        <div class="poster-emoji">${meta.emoji}</div>
-        <div class="poster-title">${word}</div>
+      <div style="display:flex;gap:12px;align-items:center;background:var(--surface2);border-radius:12px;overflow:hidden;border:2px solid var(--accent);">
+        <img src="${image}" alt="${word}"
+          style="width:80px;height:112px;object-fit:cover;flex-shrink:0;"
+          onerror="this.style.display='none'">
+        <div style="padding:10px 12px 10px 0;min-width:0;">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">${catLabel(category)}</div>
+          <div style="font-size:20px;font-weight:900;line-height:1.25;color:var(--text)">${word}</div>
+        </div>
       </div>`;
-  } else {
-    const icon = category === 'series' ? '📺' : '🎬';
-    const label = category === 'series' ? 'Serie' : 'Película';
-    wrap.innerHTML = `
-      <div style="background:var(--accent-dim);border:2px solid var(--accent);border-radius:10px;padding:12px 14px;text-align:center;">
-        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${icon} ${label}</div>
-        <div style="font-size:22px;font-weight:900;line-height:1.2">${word}</div>
-      </div>`;
+    return;
   }
+
+  // Sin imagen: gradiente para infantiles, tarjeta plana para el resto
+  if (category === 'infantiles' || category === 'both' || category === 'movies') {
+    const meta = getMovieMeta(word);
+    if (category === 'infantiles' || MOVIE_META[word]) {
+      wrap.innerHTML = `
+        <div class="movie-poster" style="background:linear-gradient(135deg,${meta.g[0]},${meta.g[1]})">
+          <div class="poster-cat">${catLabel(category)}</div>
+          <div class="poster-emoji">${meta.emoji}</div>
+          <div class="poster-title">${word}</div>
+        </div>`;
+      return;
+    }
+  }
+
+  const icon = category === 'series' ? '📺' : '🎬';
+  wrap.innerHTML = `
+    <div style="background:var(--accent-dim);border:2px solid var(--accent);border-radius:10px;padding:12px 14px;text-align:center;">
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${icon} ${catLabel(category)}</div>
+      <div style="font-size:22px;font-weight:900;line-height:1.2">${word}</div>
+    </div>`;
+}
+
+function catLabel(category) {
+  return { both:'Película / Serie', movies:'Película', series:'Serie', infantiles:'🧸 Película Infantil' }[category] || category;
 }
 
 // ── Emoji input ──

@@ -7,656 +7,537 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0f0e17; --surface: #1a1929; --surface2: #252438; --surface3: #2e2d45;
-      --accent: #a855f7; --accent-dim: rgba(168,85,247,0.15);
-      --success: #06d6a0; --danger: #ef233c; --warn: #ffd166;
-      --text: #fffffe; --text2: #a7a9be; --border: #2e2d45;
-      --radius: 10px;
+      --bg: #0f0e17; --surface: #1a1929; --s2: #252438; --s3: #2e2d45;
+      --accent: #a855f7; --adim: rgba(168,85,247,0.15);
+      --ok: #06d6a0; --err: #ef233c;
+      --text: #fffffe; --t2: #a7a9be; --border: #2e2d45; --r: 10px;
     }
-    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; font-size: 14px; }
 
-    /* ── Login ── */
-    #login {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 100vh; gap: 16px;
-    }
-    #login h1 { font-size: 28px; }
-    #login input {
-      padding: 12px 16px; font-size: 16px; background: var(--surface2);
-      border: 2px solid var(--border); border-radius: var(--radius); color: var(--text);
-      outline: none; width: 280px;
-    }
-    #login input:focus { border-color: var(--accent); }
-    #login .err { color: var(--danger); font-size: 13px; min-height: 18px; }
+    /* Login */
+    #login { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; gap:14px; }
+    #login h1 { font-size:26px; }
+    .login-input { padding:11px 14px; font-size:15px; background:var(--s2); border:2px solid var(--border); border-radius:var(--r); color:var(--text); outline:none; width:260px; }
+    .login-input:focus { border-color:var(--accent); }
 
-    /* ── Layout ── */
-    #app { display: none; height: 100vh; flex-direction: column; }
+    /* Layout */
+    #app { display:none; height:100vh; flex-direction:column; }
+    .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; height:48px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .topbar-title { font-weight:800; font-size:15px; }
+    .main { display:flex; flex:1; overflow:hidden; }
 
-    .topbar {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between;
-      flex-shrink: 0;
-    }
-    .topbar-title { font-weight: 800; font-size: 16px; }
-    .topbar-right { display: flex; gap: 10px; align-items: center; }
+    /* Sidebar */
+    .sidebar { width:230px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+    .sb-head { padding:12px 14px; font-size:11px; font-weight:700; color:var(--t2); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); }
+    .cat-list { flex:1; overflow-y:auto; padding:6px; }
+    .cat-item { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:var(--r); cursor:pointer; margin-bottom:2px; transition:background 0.1s; }
+    .cat-item:hover { background:var(--s2); }
+    .cat-item.active { background:var(--adim); }
+    .cat-thumb { width:34px; height:48px; border-radius:5px; flex-shrink:0; background:var(--s3); overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:16px; }
+    .cat-thumb img { width:100%; height:100%; object-fit:cover; }
+    .cat-info .cat-name { font-size:13px; font-weight:700; }
+    .cat-info .cat-meta { font-size:11px; color:var(--t2); }
+    .sb-foot { padding:10px; border-top:1px solid var(--border); }
 
-    .main { display: flex; flex: 1; overflow: hidden; }
+    /* Panel */
+    .panel { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+    .empty { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:var(--t2); }
 
-    /* ── Sidebar ── */
-    .sidebar {
-      width: 240px; flex-shrink: 0; background: var(--surface);
-      border-right: 1px solid var(--border); display: flex; flex-direction: column;
-      overflow: hidden;
-    }
-    .sidebar-header { padding: 14px 16px; font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
-    .cat-list { flex: 1; overflow-y: auto; padding: 8px; }
-    .cat-item {
-      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-      border-radius: var(--radius); cursor: pointer; margin-bottom: 2px; transition: background 0.1s;
-    }
-    .cat-item:hover { background: var(--surface2); }
-    .cat-item.active { background: var(--accent-dim); }
-    .cat-thumb {
-      width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0;
-      object-fit: cover; background: var(--surface3); display: flex; align-items: center; justify-content: center;
-      font-size: 18px; overflow: hidden;
-    }
-    .cat-thumb img { width: 100%; height: 100%; object-fit: cover; }
-    .cat-info { flex: 1; min-width: 0; }
-    .cat-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .cat-count { font-size: 11px; color: var(--text2); }
-    .cat-combined { font-size: 10px; background: var(--accent-dim); color: var(--accent); padding: 1px 6px; border-radius: 10px; }
-    .sidebar-footer { padding: 12px; border-top: 1px solid var(--border); }
-
-    /* ── Panel ── */
-    .panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-
-    .panel-empty { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: var(--text2); }
-    .panel-empty .icon { font-size: 48px; }
-
-    /* Category header */
-    .cat-header {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start; flex-shrink: 0;
-    }
-    .image-preview {
-      width: 72px; height: 72px; border-radius: 10px; background: var(--surface2);
-      border: 2px solid var(--border); flex-shrink: 0; overflow: hidden;
-      display: flex; align-items: center; justify-content: center; font-size: 28px;
-    }
-    .image-preview img { width: 100%; height: 100%; object-fit: cover; }
-    .cat-fields { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-    .field-row { display: flex; gap: 8px; align-items: center; }
-    .field-label { font-size: 11px; color: var(--text2); width: 80px; flex-shrink: 0; }
-    .field-input {
-      flex: 1; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); font-size: 13px; outline: none;
-    }
-    .field-input:focus { border-color: var(--accent); }
+    /* Cat header */
+    .cat-hdr { background:var(--surface); border-bottom:1px solid var(--border); padding:14px 18px; display:flex; gap:14px; align-items:center; flex-shrink:0; }
+    .cat-img-preview { width:56px; height:78px; border-radius:8px; background:var(--s2); border:2px solid var(--border); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:22px; }
+    .cat-img-preview img { width:100%; height:100%; object-fit:cover; }
+    .cat-fields { flex:1; display:flex; flex-direction:column; gap:7px; }
+    .f-row { display:flex; align-items:center; gap:8px; }
+    .f-label { font-size:11px; color:var(--t2); width:70px; flex-shrink:0; }
+    .f-inp { flex:1; padding:7px 10px; background:var(--s2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px; outline:none; }
+    .f-inp:focus { border-color:var(--accent); }
 
     /* Tabs */
-    .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 20px; flex-shrink: 0; background: var(--surface); }
-    .tab-btn {
-      padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--text2);
-      border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
-      transition: color 0.15s;
-    }
-    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-    .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
-    .tab-content.active { display: flex; }
+    .tabs { display:flex; border-bottom:1px solid var(--border); padding:0 18px; flex-shrink:0; background:var(--surface); }
+    .tab-btn { padding:9px 14px; font-size:13px; font-weight:600; color:var(--t2); border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+    .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .tab-pane { display:none; flex:1; overflow:hidden; flex-direction:column; }
+    .tab-pane.active { display:flex; }
 
     /* Words tab */
-    .words-toolbar {
-      padding: 12px 20px; display: flex; gap: 8px; align-items: center;
-      border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
-    .search-input {
-      flex: 1; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--radius); color: var(--text); font-size: 13px; outline: none;
-    }
-    .search-input:focus { border-color: var(--accent); }
+    .words-toolbar { padding:10px 18px; display:flex; gap:7px; align-items:center; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .srch { flex:1; padding:7px 11px; background:var(--s2); border:1px solid var(--border); border-radius:var(--r); color:var(--text); font-size:13px; outline:none; }
+    .srch:focus { border-color:var(--accent); }
+    .word-list { flex:1; overflow-y:auto; padding:6px 18px; }
+    .wcount { padding:4px 18px 0; font-size:11px; color:var(--t2); flex-shrink:0; }
 
-    .word-list { flex: 1; overflow-y: auto; padding: 8px 20px; }
-    .word-item {
-      display: flex; align-items: center; padding: 7px 10px; border-radius: 6px;
-      border: 1px solid transparent; margin-bottom: 3px; gap: 8px;
+    /* Word row */
+    .word-row {
+      display:flex; align-items:center; gap:8px; padding:6px 8px;
+      border-radius:7px; margin-bottom:3px; border:1px solid transparent;
     }
-    .word-item:hover { background: var(--surface2); border-color: var(--border); }
-    .word-item input {
-      flex: 1; background: none; border: none; color: var(--text); font-size: 13px;
-      outline: none; cursor: default;
-    }
-    .word-item input:focus { cursor: text; }
-    .word-item .del-btn {
-      background: none; border: none; color: var(--text2); cursor: pointer;
-      font-size: 14px; padding: 2px 6px; border-radius: 4px; opacity: 0;
-      transition: opacity 0.1s, color 0.1s;
-    }
-    .word-item:hover .del-btn { opacity: 1; }
-    .word-item .del-btn:hover { color: var(--danger); }
+    .word-row:hover { background:var(--s2); border-color:var(--border); }
+    .word-row input[type=checkbox] { flex-shrink:0; width:15px; height:15px; accent-color:var(--accent); cursor:pointer; }
+    .word-poster { width:28px; height:40px; border-radius:4px; background:var(--s3); overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; cursor:pointer; position:relative; }
+    .word-poster img { width:100%; height:100%; object-fit:cover; }
+    .word-poster:hover::after { content:'✏️'; position:absolute; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; font-size:11px; }
+    .word-fields { flex:1; display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .w-title { background:none; border:none; color:var(--text); font-size:13px; font-weight:600; outline:none; width:100%; }
+    .w-title:focus { background:var(--s3); padding:2px 6px; border-radius:4px; }
+    .w-img-url { background:none; border:none; color:var(--t2); font-size:11px; outline:none; width:100%; font-family:monospace; }
+    .w-img-url:focus { background:var(--s3); padding:2px 6px; border-radius:4px; color:var(--text); }
+    .w-img-url::placeholder { color:var(--s3); }
+    .del-btn { background:none; border:none; color:var(--t2); cursor:pointer; font-size:13px; padding:2px 5px; border-radius:4px; opacity:0; flex-shrink:0; }
+    .word-row:hover .del-btn { opacity:1; }
+    .del-btn:hover { color:var(--err); }
 
-    .add-word-bar {
-      padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0;
-    }
+    .add-bar { padding:10px 18px; border-top:1px solid var(--border); display:flex; gap:6px; flex-shrink:0; flex-direction:column; }
+    .add-row { display:flex; gap:6px; }
 
     /* Scrape tab */
-    .scrape-panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-    .scrape-toolbar { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-    .url-row { display: flex; gap: 8px; }
-    .url-input {
-      flex: 1; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--radius); color: var(--text); font-size: 13px; outline: none; font-family: monospace;
-    }
-    .url-input:focus { border-color: var(--accent); }
-    .scrape-hint { font-size: 12px; color: var(--text2); }
-
-    .scrape-results { flex: 1; overflow-y: auto; padding: 0; }
-    .scrape-results-header {
-      padding: 10px 20px; background: var(--surface2); border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0;
-    }
-    .scrape-results-count { font-size: 13px; font-weight: 700; }
-    .result-table { width: 100%; border-collapse: collapse; }
-    .result-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    .result-table tr:hover td { background: var(--surface2); }
-    .result-table .cb-col { width: 36px; text-align: center; }
-    .result-table .num-col { width: 40px; color: var(--text2); font-size: 12px; text-align: right; padding-right: 12px; }
-    .result-table .title-col input {
-      width: 100%; background: none; border: none; color: var(--text); font-size: 13px; outline: none;
-    }
-    .result-table .title-col input:focus { background: var(--surface3); padding: 2px 6px; border-radius: 4px; }
-    .scrape-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+    .scrape-wrap { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+    .scrape-top { padding:14px 18px; display:flex; flex-direction:column; gap:8px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .url-row { display:flex; gap:7px; }
+    .url-inp { flex:1; padding:9px 12px; background:var(--s2); border:1px solid var(--border); border-radius:var(--r); color:var(--text); font-size:13px; outline:none; font-family:monospace; }
+    .url-inp:focus { border-color:var(--accent); }
+    .scrape-hint { font-size:11px; color:var(--t2); }
+    .scrape-body { flex:1; overflow-y:auto; }
+    .scrape-results-hdr { position:sticky; top:0; background:var(--s2); border-bottom:1px solid var(--border); padding:8px 18px; display:flex; align-items:center; justify-content:space-between; z-index:1; }
+    .results-tbl { width:100%; border-collapse:collapse; }
+    .results-tbl td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .results-tbl tr:hover td { background:var(--s2); }
+    .res-thumb { width:32px; }
+    .res-thumb-img { width:28px; height:40px; border-radius:4px; background:var(--s3); overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .res-thumb-img img { width:100%; height:100%; object-fit:cover; }
+    .res-title-inp { background:none; border:none; color:var(--text); font-size:13px; outline:none; width:100%; }
+    .res-title-inp:focus { background:var(--s3); padding:2px 6px; border-radius:4px; }
+    .scrape-foot { padding:10px 18px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center; flex-shrink:0; }
 
     /* Buttons */
-    .btn {
-      padding: 8px 16px; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 700;
-      cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.15s;
-      white-space: nowrap;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn:active { opacity: 0.7; }
-    .btn:disabled { opacity: 0.4; pointer-events: none; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-success { background: var(--success); color: #0f0e17; }
-    .btn-danger { background: var(--danger); color: #fff; }
-    .btn-ghost { background: var(--surface2); color: var(--text); }
-    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn { padding:7px 14px; border:none; border-radius:var(--r); font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; transition:opacity 0.1s; }
+    .btn:hover { opacity:0.85; } .btn:active { opacity:0.7; } .btn:disabled { opacity:0.4; pointer-events:none; }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-ok { background:var(--ok); color:#0f0e17; }
+    .btn-err { background:var(--err); color:#fff; }
+    .btn-ghost { background:var(--s2); color:var(--text); }
+    .btn-sm { padding:5px 10px; font-size:12px; }
 
-    /* Status / toast */
-    .status-bar {
-      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-      padding: 8px 20px; border-radius: 30px; font-size: 13px; font-weight: 600;
-      opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
-    }
-    .status-bar.show { opacity: 1; }
-    .status-bar.ok { border-color: var(--success); color: var(--success); }
-    .status-bar.err { border-color: var(--danger); color: var(--danger); }
+    .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.6s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    input[type=checkbox] { accent-color:var(--accent); cursor:pointer; }
 
-    /* Loading spinner */
-    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Checkbox */
-    input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
-
-    .words-count { font-size: 12px; color: var(--text2); padding: 0 20px 8px; flex-shrink: 0; }
+    .toast { position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:var(--s2); border:1px solid var(--border); color:var(--text); padding:7px 18px; border-radius:30px; font-size:13px; font-weight:600; opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:999; white-space:nowrap; }
+    .toast.show { opacity:1; }
+    .toast.ok { border-color:var(--ok); color:var(--ok); }
+    .toast.err { border-color:var(--err); color:var(--err); }
   </style>
 </head>
 <body>
 
-<!-- Login -->
 <div id="login">
-  <div style="font-size:40px">🔧</div>
-  <h1>Panel de Administración</h1>
-  <input type="password" id="pwd-input" placeholder="Contraseña" autocomplete="current-password">
+  <div style="font-size:36px">🔧</div>
+  <h1>Panel de Admin</h1>
+  <input class="login-input" type="password" id="pwd" placeholder="Contraseña" autocomplete="current-password">
   <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
-  <div class="err" id="login-err"></div>
+  <div style="color:var(--err);font-size:12px;min-height:16px" id="login-err"></div>
 </div>
 
-<!-- App -->
 <div id="app">
   <div class="topbar">
     <div class="topbar-title">🔧 Admin · Charadas con Emojis</div>
-    <div class="topbar-right">
+    <div style="display:flex;gap:8px">
       <a href="/" target="_blank" class="btn btn-ghost btn-sm">🎮 Ver juego</a>
-      <button class="btn btn-ghost btn-sm" onclick="logout()">Cerrar sesión</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Salir</button>
     </div>
   </div>
-
   <div class="main">
-    <!-- Sidebar -->
     <div class="sidebar">
-      <div class="sidebar-header">Categorías</div>
+      <div class="sb-head">Categorías</div>
       <div class="cat-list" id="cat-list"></div>
-      <div class="sidebar-footer">
-        <button class="btn btn-ghost btn-sm" style="width:100%" onclick="newCategory()">+ Nueva categoría</button>
+      <div class="sb-foot">
+        <button class="btn btn-ghost btn-sm" style="width:100%" onclick="newCat()">+ Nueva categoría</button>
       </div>
     </div>
-
-    <!-- Panel -->
     <div class="panel" id="panel">
-      <div class="panel-empty">
-        <div class="icon">📂</div>
-        <div>Seleccioná una categoría</div>
-      </div>
+      <div class="empty"><div style="font-size:40px">📂</div><div>Seleccioná una categoría</div></div>
     </div>
   </div>
 </div>
 
-<div class="status-bar" id="status"></div>
+<div class="toast" id="toast"></div>
 
 <script>
-const ADMIN_KEY = sessionStorage.getItem('adminKey') || '';
-let categories = [];
-let selectedCat = null;
-let scrapeResults = [];
+let KEY = sessionStorage.getItem('ak') || '';
+let categories = [], selected = null, scrapeData = [];
 
-// ── Auth ──
+// ── Auth ──────────────────────────────────────────────────────────
+
+document.getElementById('pwd').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 async function doLogin() {
-  const pwd = document.getElementById('pwd-input').value;
-  const res = await fetch('/api/categories', { headers: { 'x-admin-key': pwd } });
-  // categories is public, use a private endpoint to test auth
-  const test = await fetch('/api/categories/movies', { headers: { 'x-admin-key': pwd } });
-  if (test.status === 401) {
-    document.getElementById('login-err').textContent = 'Contraseña incorrecta';
-    return;
-  }
-  sessionStorage.setItem('adminKey', pwd);
-  location.reload();
+  const k = document.getElementById('pwd').value;
+  const r = await fetch('/api/categories/movies', { headers: { 'x-admin-key': k } });
+  if (r.status === 401) { document.getElementById('login-err').textContent = 'Contraseña incorrecta'; return; }
+  sessionStorage.setItem('ak', k); location.reload();
 }
 
-document.getElementById('pwd-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+function logout() { sessionStorage.removeItem('ak'); location.reload(); }
 
-function logout() {
-  sessionStorage.removeItem('adminKey');
-  location.reload();
-}
-
-// ── Init ──
+// ── Init ─────────────────────────────────────────────────────────
 
 async function init() {
-  if (!ADMIN_KEY) return;
-  // Test auth
-  const test = await fetch('/api/categories/movies', { headers: { 'x-admin-key': ADMIN_KEY } });
-  if (test.status === 401) { sessionStorage.removeItem('adminKey'); return; }
-
+  if (!KEY) return;
+  const test = await fetch('/api/categories/movies', { headers: { 'x-admin-key': KEY } });
+  if (test.status === 401) { sessionStorage.removeItem('ak'); return; }
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-
-  await loadCategories();
+  await loadCats();
 }
 
-async function loadCategories() {
-  const res = await fetch('/api/categories');
-  categories = await res.json();
+async function loadCats() {
+  const r = await fetch('/api/categories');
+  categories = await r.json();
   renderSidebar();
-  if (selectedCat) {
-    const still = categories.find(c => c.id === selectedCat.id);
-    if (still) selectCategory(still.id);
+  if (selected) {
+    const still = categories.find(c => c.id === selected.id);
+    if (still) await selectCat(still.id);
   }
 }
 
 function renderSidebar() {
-  const el = document.getElementById('cat-list');
-  el.innerHTML = categories.map(c => `
-    <div class="cat-item ${selectedCat?.id === c.id ? 'active' : ''}" onclick="selectCategory('${c.id}')">
-      <div class="cat-thumb" id="thumb-${c.id}">
-        ${c.image ? `<img src="${c.image}" onerror="this.style.display='none'">` : getCatEmoji(c.id)}
-      </div>
+  document.getElementById('cat-list').innerHTML = categories.map(c => `
+    <div class="cat-item ${selected?.id === c.id ? 'active' : ''}" onclick="selectCat('${c.id}')">
+      <div class="cat-thumb">${c.image ? `<img src="${c.image}" onerror="this.style.display='none'">` : catIcon(c.id)}</div>
       <div class="cat-info">
-        <div class="cat-name">${c.name}</div>
-        <div class="cat-count">${c.wordCount} palabras ${c.combined ? '<span class="cat-combined">combinada</span>' : ''}</div>
+        <div class="cat-name">${esc(c.name)}</div>
+        <div class="cat-meta">${c.wordCount} palabras${c.combined ? ' · combinada' : ''}</div>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-function getCatEmoji(id) {
-  const map = { both: '🎬', movies: '🎥', series: '📺', infantiles: '🧸' };
-  return map[id] || '📁';
+function catIcon(id) {
+  return { both:'🎬', movies:'🎥', series:'📺', infantiles:'🧸' }[id] || '📁';
 }
 
-// ── Select category ──
+// ── Select cat ────────────────────────────────────────────────────
 
-async function selectCategory(id) {
-  const res = await fetch(`/api/categories/${id}`, { headers: { 'x-admin-key': ADMIN_KEY } });
-  if (!res.ok) return;
-  selectedCat = await res.json();
+async function selectCat(id) {
+  const r = await fetch(`/api/categories/${id}`, { headers: { 'x-admin-key': KEY } });
+  if (!r.ok) return;
+  selected = await r.json();
   renderSidebar();
   renderPanel();
 }
 
 function renderPanel() {
-  const cat = selectedCat;
-  const panel = document.getElementById('panel');
-  const readonly = cat.combined;
-
-  panel.innerHTML = `
-    <!-- Header -->
-    <div class="cat-header">
-      <div class="image-preview" id="img-preview">
-        ${cat.image ? `<img src="${cat.image}" onerror="this.innerHTML='📁'">` : getCatEmoji(cat.id)}
-      </div>
+  const c = selected, ro = c.combined;
+  document.getElementById('panel').innerHTML = `
+    <div class="cat-hdr">
+      <div class="cat-img-preview" id="cat-prev">${c.image ? `<img src="${c.image}" onerror="this.innerHTML='${catIcon(c.id)}'">` : catIcon(c.id)}</div>
       <div class="cat-fields">
-        <div class="field-row">
-          <span class="field-label">Nombre</span>
-          <input class="field-input" id="f-name" value="${escHtml(cat.name)}" ${readonly ? 'readonly' : ''} placeholder="Nombre de categoría">
-          ${!readonly ? `<button class="btn btn-primary btn-sm" onclick="saveCatMeta()">Guardar</button>` : ''}
+        <div class="f-row">
+          <span class="f-label">Nombre</span>
+          <input class="f-inp" id="fn" value="${esc(c.name)}" ${ro?'readonly':''}>
+          ${!ro ? `<button class="btn btn-primary btn-sm" onclick="saveMeta()">Guardar</button>` : ''}
         </div>
-        <div class="field-row">
-          <span class="field-label">Imagen URL</span>
-          <input class="field-input" id="f-image" value="${escHtml(cat.image || '')}" ${readonly ? 'readonly' : ''} placeholder="https://ejemplo.com/imagen.jpg" oninput="previewImage(this.value)">
+        <div class="f-row">
+          <span class="f-label">Imagen cat.</span>
+          <input class="f-inp" id="fi" value="${esc(c.image||'')}" ${ro?'readonly':''} placeholder="URL imagen de portada de la categoría" oninput="prevCatImg(this.value)">
         </div>
-        ${!readonly ? `<div class="field-row"><span class="field-label"></span><button class="btn btn-danger btn-sm" onclick="deleteCategory()">🗑 Eliminar categoría</button></div>` : '<div style="font-size:12px;color:var(--text2)">Categoría combinada – combina Películas + Series</div>'}
+        ${!ro ? `<div class="f-row"><span class="f-label"></span><button class="btn btn-err btn-sm" onclick="deleteCat()">🗑 Eliminar categoría</button></div>`
+               : '<div style="font-size:11px;color:var(--t2)">Combina automáticamente Películas + Series.</div>'}
       </div>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" onclick="showTab('words', this)">📝 Palabras (${cat.words?.length || 0})</button>
-      ${!readonly ? `<button class="tab-btn" onclick="showTab('scrape', this)">🌐 Importar / Scrapear</button>` : ''}
+      <button class="tab-btn active" onclick="showTab('words',this)">📝 Palabras (${c.words?.length||0})</button>
+      ${!ro ? `<button class="tab-btn" onclick="showTab('scrape',this)">🌐 Importar / Scrapear</button>` : ''}
     </div>
 
-    <!-- Words tab -->
-    <div class="tab-content active" id="tab-words">
-      ${readonly ? `
-        <div style="padding:20px;color:var(--text2);font-size:13px">
-          Esta categoría combina automáticamente las palabras de Películas y Series. Para editar palabras, seleccioná una de esas categorías.
-        </div>
-      ` : `
+    <div class="tab-pane active" id="tab-words">
+      ${ro ? `<div style="padding:18px;color:var(--t2);font-size:13px">Esta categoría combina Películas + Series. Editá cada una por separado.</div>` : `
         <div class="words-toolbar">
-          <input class="search-input" id="word-search" placeholder="🔍 Buscar palabra…" oninput="filterWords(this.value)">
-          <button class="btn btn-danger btn-sm" id="del-selected-btn" style="display:none" onclick="deleteSelected()">🗑 Eliminar seleccionadas</button>
+          <input class="srch" id="wsrch" placeholder="🔍 Buscar…" oninput="filterWords(this.value)">
+          <button class="btn btn-err btn-sm" id="bulk-del" style="display:none" onclick="bulkDelete()">🗑 Eliminar</button>
         </div>
-        <div class="words-count" id="words-count">${cat.words?.length || 0} palabras</div>
+        <div class="wcount" id="wcount"></div>
         <div class="word-list" id="word-list"></div>
-        <div class="add-word-bar">
-          <input class="search-input" id="new-word-input" placeholder="Nueva palabra…" style="flex:1" onkeydown="if(event.key==='Enter')addWord()">
-          <button class="btn btn-success" onclick="addWord()">+ Agregar</button>
+        <div class="add-bar">
+          <div class="add-row">
+            <input class="srch" id="nw-title" placeholder="Título nuevo…" style="flex:2" onkeydown="if(event.key==='Enter')addWord()">
+            <input class="srch" id="nw-img" placeholder="URL imagen (opcional)" style="flex:3">
+            <button class="btn btn-ok" onclick="addWord()">+ Agregar</button>
+          </div>
         </div>
       `}
     </div>
 
-    <!-- Scrape tab -->
-    ${!readonly ? `
-    <div class="tab-content" id="tab-scrape">
-      <div class="scrape-panel">
-        <div class="scrape-toolbar">
+    ${!ro ? `
+    <div class="tab-pane" id="tab-scrape">
+      <div class="scrape-wrap">
+        <div class="scrape-top">
           <div class="url-row">
-            <input class="url-input" id="scrape-url" placeholder="https://www.imdb.com/list/ls080023211/" value="">
-            <button class="btn btn-primary" id="scrape-btn" onclick="doScrape()">🌐 Scrapear</button>
+            <input class="url-inp" id="surl" placeholder="https://www.imdb.com/es/list/ls080023211/">
+            <button class="btn btn-primary" id="sbtn" onclick="doScrape()">🌐 Scrapear</button>
           </div>
-          <div class="scrape-hint">Pegá la URL de una lista de IMDB, Wikipedia u otro sitio. El servidor intentará extraer los títulos automáticamente.</div>
+          <div class="scrape-hint">Pegá una URL de lista de IMDB, Wikipedia, etc. El scraper extrae título e imagen de cada película automáticamente.</div>
         </div>
-        <div id="scrape-results-wrap" style="flex:1;overflow:hidden;display:flex;flex-direction:column"></div>
-        <div class="scrape-footer" id="scrape-footer" style="display:none">
-          <button class="btn btn-success" id="add-selected-btn" onclick="addSelectedScrape()">✅ Agregar seleccionados (<span id="sel-count">0</span>)</button>
-          <span id="scrape-status" style="font-size:12px;color:var(--text2)"></span>
+        <div class="scrape-body" id="scrape-body">
+          <div style="padding:30px;text-align:center;color:var(--t2)">Pegá una URL y hacé clic en Scrapear</div>
+        </div>
+        <div class="scrape-foot" id="scrape-foot" style="display:none">
+          <button class="btn btn-ok" id="add-sel-btn" onclick="addScrapeSelected()">✅ Agregar seleccionados (<span id="sel-n">0</span>)</button>
+          <span style="font-size:11px;color:var(--t2)" id="scrape-status"></span>
         </div>
       </div>
-    </div>
-    ` : ''}
+    </div>` : ''}
   `;
-
-  if (!readonly) renderWordList(cat.words || []);
+  if (!ro) renderWordList(selected.words || []);
 }
 
-// ── Words ──
+// ── Words ─────────────────────────────────────────────────────────
 
-let currentWords = [];
+let displayedWords = [];
 
 function renderWordList(words, filter = '') {
-  currentWords = [...words].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-  const filtered = filter ? currentWords.filter(w => w.toLowerCase().includes(filter.toLowerCase())) : currentWords;
-  const el = document.getElementById('word-list');
-  if (!el) return;
-  document.getElementById('words-count').textContent = `${currentWords.length} palabras${filter ? ` · ${filtered.length} resultados` : ''}`;
-  el.innerHTML = filtered.map((w, i) => `
-    <div class="word-item" id="wi-${i}">
-      <input type="checkbox" onchange="updateDelBtn()">
-      <input value="${escHtml(w)}" onchange="editWord('${escHtml(w)}', this.value)" onblur="editWord('${escHtml(w)}', this.value)">
-      <button class="del-btn" onclick="deleteWord('${escHtml(w)}')">✕</button>
-    </div>
-  `).join('');
+  displayedWords = [...words].sort((a,b) => a.title.localeCompare(b.title, 'es', {sensitivity:'base'}));
+  const shown = filter ? displayedWords.filter(w => w.title.toLowerCase().includes(filter.toLowerCase())) : displayedWords;
+  document.getElementById('wcount').textContent = `${words.length} palabras${filter ? ` · ${shown.length} resultados` : ''}`;
+  document.getElementById('word-list').innerHTML = shown.map(w => `
+    <div class="word-row" data-title="${esc(w.title)}">
+      <input type="checkbox" onchange="updBulk()">
+      <div class="word-poster" onclick="editWordImg('${esc(w.title)}','${esc(w.image||'')}',this)" title="Click para cambiar imagen">
+        ${w.image ? `<img src="${esc(w.image)}" onerror="this.style.display='none'">` : '🎬'}
+      </div>
+      <div class="word-fields">
+        <input class="w-title" value="${esc(w.title)}" onchange="saveWordEdit('${esc(w.title)}',this.value,null)" onblur="saveWordEdit('${esc(w.title)}',this.value,null)">
+        <input class="w-img-url" value="${esc(w.image||'')}" placeholder="URL de imagen del poster…" onchange="saveWordEdit('${esc(w.title)}',null,this.value)" onblur="saveWordEdit('${esc(w.title)}',null,this.value)">
+      </div>
+      <button class="del-btn" onclick="delWord('${esc(w.title)}')">✕</button>
+    </div>`).join('');
 }
 
-function filterWords(q) {
-  renderWordList(selectedCat.words || [], q);
-}
+function filterWords(q) { renderWordList(selected.words || [], q); }
 
-function updateDelBtn() {
-  const checked = document.querySelectorAll('#word-list input[type=checkbox]:checked').length;
-  const btn = document.getElementById('del-selected-btn');
-  if (btn) btn.style.display = checked > 0 ? 'inline-flex' : 'none';
-  if (btn) btn.textContent = `🗑 Eliminar (${checked})`;
+function updBulk() {
+  const n = document.querySelectorAll('#word-list input[type=checkbox]:checked').length;
+  const btn = document.getElementById('bulk-del');
+  if (btn) { btn.style.display = n ? 'inline-flex' : 'none'; btn.textContent = `🗑 Eliminar (${n})`; }
 }
 
 async function addWord() {
-  const input = document.getElementById('new-word-input');
-  const word = input.value.trim();
-  if (!word) return;
-  const res = await api('POST', `/api/categories/${selectedCat.id}/words`, { words: [word] });
-  if (res.error) { toast(res.error, 'err'); return; }
-  input.value = '';
-  selectedCat.words.push(word);
-  renderWordList(selectedCat.words);
-  toast(`"${word}" agregada ✓`);
-  refreshSidebarCount();
-}
-
-async function deleteWord(word) {
-  if (!confirm(`¿Eliminar "${word}"?`)) return;
-  await api('DELETE', `/api/categories/${selectedCat.id}/words`, { words: [word] });
-  selectedCat.words = selectedCat.words.filter(w => w !== word);
-  renderWordList(selectedCat.words, document.getElementById('word-search')?.value || '');
-  toast(`"${word}" eliminada`);
-  refreshSidebarCount();
-}
-
-async function deleteSelected() {
-  const checked = [...document.querySelectorAll('#word-list input[type=checkbox]:checked')];
-  const toDelete = checked.map(cb => cb.nextElementSibling.value);
-  if (!toDelete.length) return;
-  if (!confirm(`¿Eliminar ${toDelete.length} palabras?`)) return;
-  await api('DELETE', `/api/categories/${selectedCat.id}/words`, { words: toDelete });
-  selectedCat.words = selectedCat.words.filter(w => !toDelete.includes(w));
-  renderWordList(selectedCat.words);
-  toast(`${toDelete.length} palabras eliminadas`);
-  refreshSidebarCount();
-}
-
-async function editWord(oldVal, newVal) {
-  newVal = newVal.trim();
-  if (!newVal || newVal === oldVal) return;
-  // Delete old, add new
-  await api('DELETE', `/api/categories/${selectedCat.id}/words`, { words: [oldVal] });
-  await api('POST', `/api/categories/${selectedCat.id}/words`, { words: [newVal] });
-  selectedCat.words = selectedCat.words.map(w => w === oldVal ? newVal : w);
-  toast('Palabra editada ✓');
-}
-
-// ── Category meta ──
-
-async function saveCatMeta() {
-  const name = document.getElementById('f-name').value.trim();
-  const image = document.getElementById('f-image').value.trim();
-  await api('PUT', `/api/categories/${selectedCat.id}`, { name, image });
-  selectedCat.name = name; selectedCat.image = image;
-  await loadCategories();
-  toast('Categoría actualizada ✓');
-}
-
-function previewImage(url) {
-  const preview = document.getElementById('img-preview');
-  if (!preview) return;
-  if (url) {
-    preview.innerHTML = `<img src="${url}" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover">`;
+  const title = document.getElementById('nw-title').value.trim();
+  const image = document.getElementById('nw-img').value.trim();
+  if (!title) return;
+  const r = await api('POST', `/api/categories/${selected.id}/words`, { words: [{ title, image }] });
+  if (r.error) { toast(r.error,'err'); return; }
+  document.getElementById('nw-title').value = '';
+  document.getElementById('nw-img').value = '';
+  if (r.added.length) {
+    selected.words.push({ title, image });
+    renderWordList(selected.words);
+    refreshCount();
+    toast(`"${title}" agregada ✓`);
   } else {
-    preview.innerHTML = getCatEmoji(selectedCat.id);
+    toast('Ya existe esta palabra','err');
   }
 }
 
-async function deleteCategory() {
-  if (!confirm(`¿Eliminar la categoría "${selectedCat.name}" y todas sus palabras?`)) return;
-  await api('DELETE', `/api/categories/${selectedCat.id}`);
-  selectedCat = null;
-  await loadCategories();
-  document.getElementById('panel').innerHTML = `<div class="panel-empty"><div class="icon">📂</div><div>Seleccioná una categoría</div></div>`;
+async function delWord(title) {
+  if (!confirm(`¿Eliminar "${title}"?`)) return;
+  await api('DELETE', `/api/categories/${selected.id}/words`, { words: [title] });
+  selected.words = selected.words.filter(w => w.title !== title);
+  renderWordList(selected.words, document.getElementById('wsrch')?.value || '');
+  refreshCount(); toast(`"${title}" eliminada`);
+}
+
+async function bulkDelete() {
+  const checked = [...document.querySelectorAll('#word-list input[type=checkbox]:checked')];
+  const titles = checked.map(cb => cb.closest('.word-row').dataset.title);
+  if (!titles.length || !confirm(`¿Eliminar ${titles.length} palabras?`)) return;
+  await api('DELETE', `/api/categories/${selected.id}/words`, { words: titles });
+  selected.words = selected.words.filter(w => !titles.includes(w.title));
+  renderWordList(selected.words);
+  refreshCount(); toast(`${titles.length} palabras eliminadas`);
+}
+
+let editTimer = {};
+async function saveWordEdit(oldTitle, newTitle, newImage) {
+  clearTimeout(editTimer[oldTitle]);
+  editTimer[oldTitle] = setTimeout(async () => {
+    const current = selected.words.find(w => w.title === oldTitle);
+    if (!current) return;
+    const title = newTitle !== null ? newTitle.trim() : current.title;
+    const image = newImage !== null ? newImage.trim() : current.image;
+    if (title === current.title && image === current.image) return;
+    await api('PUT', `/api/categories/${selected.id}/words`, { oldTitle, title, image });
+    current.title = title; current.image = image;
+    // Update poster thumbnail inline
+    const row = document.querySelector(`.word-row[data-title="${esc(oldTitle)}"]`);
+    if (row) {
+      row.dataset.title = title;
+      const poster = row.querySelector('.word-poster');
+      if (poster) poster.innerHTML = image ? `<img src="${esc(image)}" onerror="this.style.display='none'">🎬` : '🎬';
+    }
+  }, 600);
+}
+
+function editWordImg(title, currentImg, posterEl) {
+  const newUrl = prompt('URL de imagen para este póster:', currentImg);
+  if (newUrl === null) return;
+  posterEl.innerHTML = newUrl ? `<img src="${esc(newUrl)}" onerror="this.style.display='none'">` : '🎬';
+  saveWordEdit(title, null, newUrl);
+}
+
+// ── Cat meta ──────────────────────────────────────────────────────
+
+async function saveMeta() {
+  const name = document.getElementById('fn').value.trim();
+  const image = document.getElementById('fi').value.trim();
+  await api('PUT', `/api/categories/${selected.id}`, { name, image });
+  selected.name = name; selected.image = image;
+  await loadCats(); toast('Categoría actualizada ✓');
+}
+
+function prevCatImg(url) {
+  const el = document.getElementById('cat-prev');
+  if (!el) return;
+  el.innerHTML = url ? `<img src="${esc(url)}" onerror="this.innerHTML='${catIcon(selected.id)}'">` : catIcon(selected.id);
+}
+
+async function deleteCat() {
+  if (!confirm(`¿Eliminar "${selected.name}" y todas sus palabras?`)) return;
+  await api('DELETE', `/api/categories/${selected.id}`);
+  selected = null;
+  await loadCats();
+  document.getElementById('panel').innerHTML = `<div class="empty"><div style="font-size:40px">📂</div><div>Seleccioná una categoría</div></div>`;
   toast('Categoría eliminada');
 }
 
-async function newCategory() {
+async function newCat() {
   const name = prompt('Nombre de la nueva categoría:');
   if (!name?.trim()) return;
-  const res = await api('POST', '/api/categories', { name: name.trim() });
-  if (res.error) { toast(res.error, 'err'); return; }
-  await loadCategories();
-  selectCategory(res.id);
-  toast(`Categoría "${name}" creada ✓`);
+  const r = await api('POST', '/api/categories', { name: name.trim() });
+  if (r.error) { toast(r.error,'err'); return; }
+  await loadCats(); selectCat(r.id); toast(`"${name}" creada ✓`);
 }
 
-// ── Scraper ──
+// ── Scraper ───────────────────────────────────────────────────────
 
 async function doScrape() {
-  const url = document.getElementById('scrape-url').value.trim();
+  const url = document.getElementById('surl').value.trim();
   if (!url) return;
-  const btn = document.getElementById('scrape-btn');
-  const wrap = document.getElementById('scrape-results-wrap');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Scrapeando…';
-  wrap.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text2)"><span class="spinner"></span> Extrayendo títulos…</div>';
-  document.getElementById('scrape-footer').style.display = 'none';
+  const btn = document.getElementById('sbtn');
+  const body = document.getElementById('scrape-body');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Scrapeando…';
+  body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--t2)"><span class="spinner"></span> Extrayendo títulos e imágenes…</div>';
+  document.getElementById('scrape-foot').style.display = 'none';
 
-  const res = await api('POST', '/api/scrape', { url });
-  btn.disabled = false;
-  btn.innerHTML = '🌐 Scrapear';
+  const r = await api('POST', '/api/scrape', { url });
+  btn.disabled = false; btn.innerHTML = '🌐 Scrapear';
 
-  if (res.error) {
-    wrap.innerHTML = `<div style="padding:20px;color:var(--danger)">❌ Error: ${escHtml(res.error)}</div>`;
+  if (r.error) {
+    body.innerHTML = `<div style="padding:18px;color:var(--err)">❌ Error: ${esc(r.error)}<br><br><span style="color:var(--t2);font-size:12px">IMDB puede bloquear el acceso desde el servidor. Intentá con Wikipedia u otro sitio de listas de películas.</span></div>`;
     return;
   }
 
-  scrapeResults = res.titles.map(t => ({ title: t, checked: true }));
+  scrapeData = (r.results || []).map(item => ({ ...item, checked: true }));
   renderScrapeResults();
 }
 
 function renderScrapeResults() {
-  const wrap = document.getElementById('scrape-results-wrap');
-  if (!scrapeResults.length) {
-    wrap.innerHTML = '<div style="padding:20px;color:var(--text2)">No se encontraron títulos. Intentá con otra URL o revisá que el sitio sea accesible.</div>';
+  const body = document.getElementById('scrape-body');
+  if (!scrapeData.length) {
+    body.innerHTML = '<div style="padding:18px;color:var(--t2)">No se encontraron títulos. Probá con otra URL.</div>';
     return;
   }
-
-  const checkedCount = scrapeResults.filter(r => r.checked).length;
-  wrap.innerHTML = `
-    <div class="scrape-results-header">
-      <div class="scrape-results-count">📥 ${scrapeResults.length} títulos encontrados</div>
-      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" ${checkedCount === scrapeResults.length ? 'checked' : ''} onchange="toggleAllScrape(this.checked)"> Seleccionar todos
+  const nChecked = scrapeData.filter(r => r.checked).length;
+  body.innerHTML = `
+    <div class="scrape-results-hdr">
+      <span style="font-size:13px;font-weight:700">📥 ${scrapeData.length} títulos encontrados</span>
+      <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px">
+        <input type="checkbox" ${nChecked===scrapeData.length?'checked':''} onchange="toggleAll(this.checked)"> Seleccionar todos
       </label>
     </div>
-    <div class="scrape-results" style="flex:1;overflow-y:auto">
-      <table class="result-table">
-        <tbody id="scrape-tbody">
-          ${scrapeResults.map((r, i) => `
-            <tr>
-              <td class="cb-col"><input type="checkbox" ${r.checked ? 'checked' : ''} onchange="toggleScrapeItem(${i}, this.checked)"></td>
-              <td class="num-col">${i + 1}</td>
-              <td class="title-col"><input value="${escHtml(r.title)}" onchange="scrapeResults[${i}].title = this.value"></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-
-  updateScrapeFooter();
-  document.getElementById('scrape-footer').style.display = 'flex';
+    <table class="results-tbl">
+      <tbody>
+        ${scrapeData.map((item, i) => `
+          <tr>
+            <td style="width:36px;text-align:center"><input type="checkbox" ${item.checked?'checked':''} onchange="toggleItem(${i},this.checked)"></td>
+            <td class="res-thumb">
+              <div class="res-thumb-img">
+                ${item.image ? `<img src="${esc(item.image)}" onerror="this.style.display='none'">` : '🎬'}
+              </div>
+            </td>
+            <td><input class="res-title-inp" value="${esc(item.title)}" onchange="scrapeData[${i}].title=this.value"></td>
+            <td style="width:200px">
+              <input style="width:100%;background:none;border:none;color:var(--t2);font-size:11px;outline:none;font-family:monospace"
+                value="${esc(item.image)}" placeholder="URL imagen…"
+                onchange="scrapeData[${i}].image=this.value;this.closest('tr').querySelector('.res-thumb-img').innerHTML=this.value?'<img src='+JSON.stringify(this.value)+' onerror=this.style.display=none>':'🎬'"
+              >
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+  updScrapeFooter();
+  document.getElementById('scrape-foot').style.display = 'flex';
 }
 
-function toggleAllScrape(checked) {
-  scrapeResults.forEach(r => r.checked = checked);
-  renderScrapeResults();
+function toggleAll(v) { scrapeData.forEach(r => r.checked = v); renderScrapeResults(); }
+function toggleItem(i, v) { scrapeData[i].checked = v; updScrapeFooter(); }
+function updScrapeFooter() {
+  const n = scrapeData.filter(r => r.checked).length;
+  document.getElementById('sel-n').textContent = n;
+  document.getElementById('add-sel-btn').disabled = n === 0;
 }
 
-function toggleScrapeItem(i, checked) {
-  scrapeResults[i].checked = checked;
-  updateScrapeFooter();
-}
-
-function updateScrapeFooter() {
-  const count = scrapeResults.filter(r => r.checked).length;
-  document.getElementById('sel-count').textContent = count;
-  document.getElementById('add-selected-btn').disabled = count === 0;
-}
-
-async function addSelectedScrape() {
-  const toAdd = scrapeResults.filter(r => r.checked).map(r => r.title.trim()).filter(Boolean);
+async function addScrapeSelected() {
+  const toAdd = scrapeData.filter(r => r.checked).map(r => ({ title: r.title.trim(), image: r.image || '' })).filter(r => r.title);
   if (!toAdd.length) return;
-  const res = await api('POST', `/api/categories/${selectedCat.id}/words`, { words: toAdd });
-  if (res.error) { toast(res.error, 'err'); return; }
-  selectedCat.words = [...new Set([...selectedCat.words, ...toAdd])];
-  toast(`✓ ${res.added.length} palabras agregadas (${res.added.length === toAdd.length ? 'todas nuevas' : `${toAdd.length - res.added.length} ya existían`})`);
-  // Clear results
-  scrapeResults = [];
-  document.getElementById('scrape-results-wrap').innerHTML = '';
-  document.getElementById('scrape-footer').style.display = 'none';
-  document.getElementById('scrape-url').value = '';
-  refreshSidebarCount();
-  // Switch to words tab
+  const r = await api('POST', `/api/categories/${selected.id}/words`, { words: toAdd });
+  if (r.error) { toast(r.error,'err'); return; }
+  toast(`✓ ${r.added.length} palabras agregadas${r.added.length < toAdd.length ? ` (${toAdd.length - r.added.length} ya existían)` : ''}`);
+  selected.words = [...selected.words, ...r.added.map(title => {
+    const found = toAdd.find(w => w.title === title);
+    return found || { title, image: '' };
+  })];
+  scrapeData = [];
+  document.getElementById('scrape-body').innerHTML = '<div style="padding:18px;color:var(--t2)">✓ Palabras agregadas. Pegá otra URL para seguir importando.</div>';
+  document.getElementById('scrape-foot').style.display = 'none';
+  document.getElementById('surl').value = '';
+  refreshCount();
   showTab('words', document.querySelector('.tab-btn'));
-  renderWordList(selectedCat.words);
+  renderWordList(selected.words);
 }
 
-// ── Helpers ──
+// ── Helpers ───────────────────────────────────────────────────────
 
 function showTab(name, btn) {
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  const tab = document.getElementById(`tab-${name}`);
-  if (tab) tab.classList.add('active');
-  if (btn) btn.classList.add('active');
+  document.getElementById(`tab-${name}`)?.classList.add('active');
+  btn?.classList.add('active');
+}
+
+function refreshCount() {
+  const cat = categories.find(c => c.id === selected?.id);
+  if (cat) cat.wordCount = selected.words?.length || 0;
+  renderSidebar();
+  const tb = document.querySelector('.tab-btn');
+  if (tb && tb.textContent.includes('Palabras')) tb.textContent = `📝 Palabras (${selected.words?.length || 0})`;
 }
 
 async function api(method, url, body) {
   try {
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return await res.json();
-  } catch (e) {
-    return { error: e.message };
-  }
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY }, body: body ? JSON.stringify(body) : undefined });
+    return await r.json();
+  } catch(e) { return { error: e.message }; }
 }
 
-function refreshSidebarCount() {
-  const cat = categories.find(c => c.id === selectedCat?.id);
-  if (cat) cat.wordCount = selectedCat.words?.length || 0;
-  renderSidebar();
-  // Update tab label
-  const tabBtn = document.querySelector('.tab-btn');
-  if (tabBtn && tabBtn.textContent.includes('Palabras')) {
-    tabBtn.textContent = `📝 Palabras (${selectedCat.words?.length || 0})`;
-  }
+let toastT;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast show ${type}`;
+  clearTimeout(toastT); toastT = setTimeout(() => el.className='toast', 2500);
 }
 
-let toastTimer;
-function toast(msg, type = 'ok') {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = `status-bar show ${type}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = 'status-bar', 2500);
-}
-
-function escHtml(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 init();
 </script>
