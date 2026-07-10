@@ -23,14 +23,24 @@
     html, body {
       height: 100%; height: 100dvh; overflow: hidden;
       background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Color Emoji', sans-serif;
+    }
+
+    /* Zona segura para TV: los televisores recortan ~3-5% de los bordes (overscan) */
+    :root { --tv-safe-x: 3vw; --tv-safe-y: 2.5vh; }
+
+    /* Emojis como imágenes (Twemoji): se ven idénticos en cualquier navegador o TV */
+    img.emoji {
+      width: 1em; height: 1em;
+      vertical-align: -0.12em; display: inline-block;
+      margin: 0 0.04em;
     }
 
     /* ─── JOIN SCREEN ─── */
     #s-join {
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      height: 100vh; gap: 24px; padding: 40px;
+      height: 100%; gap: 24px; padding: 40px;
       background: radial-gradient(ellipse at center, #1e1b3a 0%, var(--bg) 70%);
     }
     #s-join h1 { font-size: 48px; }
@@ -47,12 +57,17 @@
     .err { color: var(--danger); font-size: 16px; }
 
     /* ─── DISPLAY SCREEN ─── */
-    #s-display { display: none; height: 100vh; flex-direction: column; }
+    #s-display {
+      display: none; height: 100%; flex-direction: column;
+      padding: var(--tv-safe-y) var(--tv-safe-x);
+    }
 
     /* Top bar */
     .top-bar {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 20px 40px; background: var(--surface); flex-shrink: 0;
+      flex-wrap: wrap; gap: 12px;
+      padding: 16px 24px; background: var(--surface); flex-shrink: 0;
+      border-radius: 16px;
     }
 
     .score-panel { display: flex; align-items: center; gap: 16px; }
@@ -95,11 +110,12 @@
     /* Emoji stage */
     .emoji-stage {
       flex: 1; display: flex; align-items: center; justify-content: center;
-      padding: 40px; overflow: hidden;
+      padding: 24px; overflow: hidden; min-height: 0;
     }
     .emoji-big {
-      font-size: 100px; line-height: 1.2; text-align: center;
-      word-break: break-all;
+      font-size: 100px; line-height: 1.25; text-align: center;
+      word-break: break-word; overflow-wrap: anywhere;
+      max-width: 100%; max-height: 100%;
       animation: none;
     }
     .emoji-big.updated { animation: pulse 0.3s ease; }
@@ -108,8 +124,9 @@
 
     /* Player bar */
     .player-bar {
-      padding: 16px 40px; background: var(--surface); flex-shrink: 0;
+      padding: 12px 24px; background: var(--surface); flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; gap: 20px;
+      border-radius: 16px;
     }
     .player-chip {
       display: flex; align-items: center; gap: 8px;
@@ -136,7 +153,7 @@
 
     /* Lobby display */
     #s-lobby-display {
-      display: none; height: 100vh; flex-direction: column;
+      display: none; height: 100%; flex-direction: column;
       align-items: center; justify-content: center; gap: 32px; padding: 40px;
     }
     .lobby-display-code { font-size: 80px; font-weight: 900; letter-spacing: 12px; color: var(--accent); }
@@ -219,9 +236,40 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/dist/twemoji.min.js" crossorigin="anonymous"></script>
 <script>
 const socket = io();
 let room = null;
+
+// Renderiza emojis como imágenes SVG (Twemoji). Si el CDN falla, cae al texto normal.
+const TW_OPTS = { folder: 'svg', ext: '.svg', base: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/' };
+
+function emojiHtml(text) {
+  if (typeof twemoji === 'undefined') return null;
+  try { return twemoji.parse(escHtml(text), TW_OPTS); }
+  catch { return null; }
+}
+
+// Convierte los emojis de texto dentro de un elemento ya renderizado
+function parseEl(el) {
+  if (typeof twemoji !== 'undefined' && el) {
+    try { twemoji.parse(el, TW_OPTS); } catch {}
+  }
+}
+
+// Emojis estáticos del HTML (título, marcadores, esperando…)
+document.addEventListener('DOMContentLoaded', () => parseEl(document.body));
+
+function escHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Aplica Twemoji a un elemento con texto plano
+function setEmojiContent(el, text) {
+  const html = emojiHtml(text);
+  if (html !== null) el.innerHTML = html;
+  else el.textContent = text;
+}
 
 // Auto-join from URL param
 const params = new URLSearchParams(location.search);
@@ -267,7 +315,7 @@ socket.on('newTurn', ({ room: r }) => {
   updateScores(r.scores);
   updateTurnInfo(r);
   setEmojis([]);
-  updateTimer(60);
+  updateTimer(r.turnDuration || 60);
 });
 
 socket.on('emojiTextUpdate', ({ text }) => {
@@ -305,6 +353,7 @@ function renderLobbyPlayers(r) {
   el.innerHTML = r.players.map(p => `
     <div class="lobby-player-chip t${p.team || 1}">${p.name}</div>
   `).join('');
+  parseEl(el);
 }
 
 function showGameDisplay(r) {
@@ -319,13 +368,17 @@ function showGameDisplay(r) {
 function setEmojis(emojis) {
   const el = document.getElementById('d-emojis');
   const waiting = document.getElementById('d-waiting');
-  if (!emojis || emojis.length === 0) {
+  const text = Array.isArray(emojis) ? emojis.join('') : (emojis || '');
+  if (!text) {
     el.style.display = 'none';
     waiting.style.display = 'block';
   } else {
     waiting.style.display = 'none';
     el.style.display = 'block';
-    el.textContent = emojis.join('');
+    // Tamaño adaptativo: cuantos más emojis, más chicos, para que nunca se corten
+    const count = [...text].length;
+    el.style.fontSize = count <= 8 ? '110px' : count <= 16 ? '84px' : count <= 30 ? '64px' : '48px';
+    setEmojiContent(el, text);
     el.classList.remove('updated');
     void el.offsetWidth;
     el.classList.add('updated');
@@ -333,12 +386,13 @@ function setEmojis(emojis) {
 }
 
 function updateTimer(t) {
+  const max = (room && room.turnDuration) || 60;
+  const warn = max * 0.33;
+  const color = t > warn ? 'var(--success)' : t > warn * 0.5 ? '#ffd166' : 'var(--danger)';
   document.getElementById('d-timer').textContent = t;
-  document.getElementById('d-timer').style.color =
-    t > 20 ? 'var(--success)' : t > 10 ? '#ffd166' : 'var(--danger)';
-  document.getElementById('d-timer-bar').style.width = (t / 60 * 100) + '%';
-  document.getElementById('d-timer-bar').style.background =
-    t > 20 ? 'var(--success)' : t > 10 ? '#ffd166' : 'var(--danger)';
+  document.getElementById('d-timer').style.color = color;
+  document.getElementById('d-timer-bar').style.width = Math.min(100, t / max * 100) + '%';
+  document.getElementById('d-timer-bar').style.background = color;
 }
 
 function updateScores(scores) {
@@ -349,8 +403,8 @@ function updateScores(scores) {
 function updateTurnInfo(r) {
   const clueGiver = r.players.find(p => p.id === r.currentPlayer);
   const teamName = r.currentTeam === 1 ? '🟠 Equipo 1' : '🔵 Equipo 2';
-  document.getElementById('d-turn').textContent =
-    clueGiver ? `${teamName} · ${clueGiver.name} da pistas` : teamName;
+  setEmojiContent(document.getElementById('d-turn'),
+    clueGiver ? `${teamName} · ${clueGiver.name} da pistas` : teamName);
   document.getElementById('d-turn').style.color =
     r.currentTeam === 1 ? 'var(--t1)' : 'var(--t2)';
 
@@ -367,11 +421,12 @@ function updateTurnInfo(r) {
       ${p.name}${isCurrent ? ' 🎭' : ''}
     </div>`;
   }).join('');
+  parseEl(playersEl);
 }
 
 function showOverlay(emoji, title, sub, color) {
-  document.getElementById('ov-emoji').textContent = emoji;
-  document.getElementById('ov-title').textContent = title;
+  setEmojiContent(document.getElementById('ov-emoji'), emoji);
+  setEmojiContent(document.getElementById('ov-title'), title);
   document.getElementById('ov-title').style.color = color || 'var(--text)';
   document.getElementById('ov-sub').textContent = sub;
   document.getElementById('overlay').classList.add('show');
