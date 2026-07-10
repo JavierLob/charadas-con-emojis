@@ -37,8 +37,10 @@
     .screen.active { display: flex; flex-direction: column; }
 
     /* ── HOME ── */
+    button { touch-action: manipulation; }
     #s-home {
-      align-items: center; justify-content: center; padding: 24px; gap: 18px;
+      align-items: center; justify-content: center; justify-content: safe center;
+      padding: 24px; gap: 18px;
       background: radial-gradient(ellipse at top, #1e1b3a 0%, var(--bg) 70%);
     }
     .logo { font-size: 64px; animation: float 3s ease-in-out infinite; }
@@ -314,6 +316,51 @@
     }
     .dur-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
+    /* ── Emoji picker ── */
+    .emoji-picker {
+      display: none; flex-direction: column; flex-shrink: 0;
+      height: 42vh; height: 42dvh; max-height: 340px;
+      background: var(--surface); border-top: 1px solid var(--surface2);
+    }
+    .emoji-picker.open { display: flex; }
+    .picker-search-row { padding: 8px 12px 4px; }
+    #emoji-search {
+      width: 100%; padding: 10px 14px; font-size: 16px; /* 16px evita zoom en iOS */
+      background: var(--surface2); border: 2px solid transparent; border-radius: 10px;
+      color: var(--text); outline: none;
+    }
+    #emoji-search:focus { border-color: var(--accent); }
+    .picker-tabs {
+      display: flex; gap: 2px; padding: 4px 8px; overflow-x: auto;
+      flex-shrink: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .picker-tabs::-webkit-scrollbar { display: none; }
+    .picker-tab {
+      flex: 1; min-width: 40px; padding: 7px 0; font-size: 20px; text-align: center;
+      background: none; border: none; border-radius: 8px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; opacity: 0.45; transition: opacity 0.1s, background 0.1s;
+    }
+    .picker-tab.active { opacity: 1; background: var(--surface2); }
+    .picker-grid {
+      flex: 1; overflow-y: auto; padding: 4px 8px calc(8px + var(--safe-b));
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+      align-content: start; gap: 2px; -webkit-overflow-scrolling: touch;
+    }
+    .picker-emoji {
+      font-size: 26px; padding: 7px 0; background: none; border: none;
+      border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+      line-height: 1.2;
+    }
+    .picker-emoji:active { background: var(--accent-dim); transform: scale(1.2); }
+    .picker-empty { grid-column: 1/-1; text-align: center; color: var(--text2); font-size: 13px; padding: 20px; }
+    .picker-toggle {
+      background: var(--surface2); border: none; font-size: 24px;
+      width: 48px; height: 56px; border-radius: 10px; cursor: pointer;
+      flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .picker-toggle.open { background: var(--accent-dim); box-shadow: inset 0 0 0 2px var(--accent); }
+
     /* Emoji-only warning */
     .emoji-warn {
       font-size: 11px; color: var(--danger); text-align: center;
@@ -497,10 +544,21 @@
       </div>
     </div>
 
+    <!-- Selector de emojis con buscador -->
+    <div class="emoji-picker" id="emoji-picker">
+      <div class="picker-search-row">
+        <input type="search" id="emoji-search" placeholder="🔍 Buscar: perro, fuego, corazón…"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="picker-tabs" id="picker-tabs"></div>
+      <div class="picker-grid" id="picker-grid"></div>
+    </div>
+
     <!-- Input nativo del teclado -->
     <div class="emoji-input-wrap">
       <div class="emoji-input-label">Tus emojis (todos los ven en tiempo real)</div>
       <div class="emoji-input-row">
+        <button class="picker-toggle" id="picker-toggle" onclick="togglePicker()" title="Buscar emojis">😀</button>
         <textarea id="emoji-input" rows="1" placeholder="😀🎬🏆"
           inputmode="text"
           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -567,6 +625,7 @@
 </button>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="/emoji-data.js"></script>
 <script>
 // ── Android nav bar safe area ────────────────────────────────────
 // env(safe-area-inset-bottom) covers gesture nav and iOS home indicator.
@@ -745,11 +804,9 @@ const state = {
 const savedRoom = localStorage.getItem('charadas_room');
 const savedName = localStorage.getItem('charadas_name');
 
-if (savedRoom && savedName) {
+if (savedRoom) {
   document.getElementById('rejoin-code').textContent = savedRoom;
-  document.getElementById('rejoin-name').textContent = savedName;
   document.getElementById('rejoin-card').style.display = 'block';
-  document.getElementById('player-name').value = savedName;
 }
 
 function doRejoin() {
@@ -794,11 +851,7 @@ socket.on('roomReady', ({ room, playerId }) => {
     showScreen('s-lobby');
   }
 
-  // Restore name in input if empty
-  if (savedName && !document.getElementById('player-name').value) {
-    document.getElementById('player-name').value = savedName;
-  }
-  saveSession(room.code, savedName || document.getElementById('player-name').value);
+  saveSession(room.code, savedName || '');
 });
 
 socket.on('rejoinFailed', msg => {
@@ -1221,6 +1274,78 @@ emojiInput.addEventListener('paste', e => {
   emojiInput.value = current.slice(0, start) + filtered + current.slice(end);
   emojiInput.dispatchEvent(new Event('input'));
 });
+
+// ── Emoji picker con buscador ────────────────────────────────────
+
+let pickerBuilt = false;
+let activeTab = Object.keys(EMOJI_DATA)[0];
+
+function normalize(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function togglePicker() {
+  const picker = document.getElementById('emoji-picker');
+  const btn = document.getElementById('picker-toggle');
+  const open = picker.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  if (open) {
+    if (!pickerBuilt) buildPicker();
+    // Cierra el teclado nativo para que el picker tenga espacio
+    document.getElementById('emoji-input').blur();
+  }
+}
+
+function buildPicker() {
+  pickerBuilt = true;
+  const tabs = document.getElementById('picker-tabs');
+  tabs.innerHTML = Object.keys(EMOJI_DATA).map(k =>
+    `<button class="picker-tab ${k === activeTab ? 'active' : ''}" data-tab="${k}" title="${EMOJI_DATA[k].name}">${k}</button>`
+  ).join('');
+  tabs.querySelectorAll('.picker-tab').forEach(b => {
+    b.addEventListener('click', () => {
+      activeTab = b.dataset.tab;
+      document.getElementById('emoji-search').value = '';
+      tabs.querySelectorAll('.picker-tab').forEach(t => t.classList.toggle('active', t === b));
+      renderGrid(EMOJI_DATA[activeTab].list);
+    });
+  });
+  renderGrid(EMOJI_DATA[activeTab].list);
+
+  document.getElementById('emoji-search').addEventListener('input', e => {
+    const q = normalize(e.target.value.trim());
+    if (!q) { renderGrid(EMOJI_DATA[activeTab].list); return; }
+    // Busca en todas las categorías
+    const results = [];
+    for (const key of Object.keys(EMOJI_DATA)) {
+      for (const item of EMOJI_DATA[key].list) {
+        if (normalize(item[1]).includes(q)) results.push(item);
+        if (results.length >= 120) break;
+      }
+      if (results.length >= 120) break;
+    }
+    renderGrid(results, true);
+  });
+}
+
+function renderGrid(list, isSearch) {
+  const grid = document.getElementById('picker-grid');
+  if (!list.length) {
+    grid.innerHTML = '<div class="picker-empty">Sin resultados 😕</div>';
+    return;
+  }
+  grid.innerHTML = list.map(([e]) => `<button class="picker-emoji">${e}</button>`).join('');
+  grid.querySelectorAll('.picker-emoji').forEach(b => {
+    b.addEventListener('click', () => insertEmoji(b.textContent));
+  });
+  if (isSearch) grid.scrollTop = 0;
+}
+
+function insertEmoji(e) {
+  emojiInput.value += e;
+  // Reusar el pipeline del input: filtra, sincroniza y ajusta altura
+  emojiInput.dispatchEvent(new Event('input'));
+}
 
 function clearEmojiInput() {
   emojiInput.value = '';

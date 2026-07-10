@@ -10,8 +10,18 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Caché: HTML siempre fresco (los deploys se ven al instante), assets estáticos 1h
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  },
+}));
 app.use(express.json());
+app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
 // ── Data ──────────────────────────────────────────────────────────
 
@@ -19,15 +29,40 @@ app.use(express.json());
 // to survive redeploys. Otherwise data.json inside the repo resets on each deploy.
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 
-function loadData() {
+const firestore = require('./firestore');
+
+function loadLocalData() {
   try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
   catch { return { categories: [] }; }
 }
+
+// Guarda en Firestore (fuente de verdad) y en el archivo local (caché/fallback)
 function saveData() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  try { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); }
+  catch (e) { console.error('No se pudo escribir caché local:', e.message); }
+  firestore.saveAllCategories(data.categories)
+    .catch(e => console.error('Error guardando en Firestore:', e.message));
 }
 
-let data = loadData();
+let data = loadLocalData();
+
+// Al arrancar: Firestore es la fuente de verdad. Si está vacío, se siembra
+// con los datos locales. Si falla, seguimos con la caché local.
+(async () => {
+  try {
+    const cats = await firestore.loadCategories();
+    if (cats.length > 0) {
+      data = { categories: cats };
+      try { fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2)); } catch {}
+      console.log(`✅ ${cats.length} categorías cargadas desde Firestore`);
+    } else if (data.categories.length > 0) {
+      await firestore.saveAllCategories(data.categories);
+      console.log(`⬆ Firestore vacío — sembrado con ${data.categories.length} categorías locales`);
+    }
+  } catch (e) {
+    console.error('⚠ Firestore no disponible, usando data.json local:', e.message);
+  }
+})();
 
 function norm(w) {
   return typeof w === 'string' ? { title: w, image: '' } : { title: w.title || '', image: w.image || '' };
@@ -111,8 +146,9 @@ app.delete('/api/categories/:id', adminAuth, (req, res) => {
   const idx = data.categories.findIndex(c => c.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'No encontrada' });
   if (data.categories[idx].combined) return res.status(400).json({ error: 'No se puede eliminar la categoría combinada' });
-  data.categories.splice(idx, 1);
+  const [removed] = data.categories.splice(idx, 1);
   saveData();
+  firestore.deleteCategory(removed.id).catch(e => console.error('Error borrando en Firestore:', e.message));
   res.json({ ok: true });
 });
 
@@ -169,8 +205,12 @@ app.post('/api/import', adminAuth, (req, res) => {
   if (!incoming?.categories || !Array.isArray(incoming.categories)) {
     return res.status(400).json({ error: 'Formato inválido. Se espera { categories: [...] }' });
   }
+  const oldIds = data.categories.map(c => c.id);
   data = incoming;
   saveData();
+  const newIds = new Set(data.categories.map(c => c.id));
+  oldIds.filter(id => !newIds.has(id)).forEach(id =>
+    firestore.deleteCategory(id).catch(e => console.error('Error borrando en Firestore:', e.message)));
   res.json({ ok: true, categories: data.categories.length });
 });
 
